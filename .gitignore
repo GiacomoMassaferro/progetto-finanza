@@ -1,0 +1,14 @@
+# Dipendenze (qualsiasi livello)
+node_modules/
+
+# Segreti: mai committare i .env reali (usare .env.example come riferimento)
+.env
+!.env.example
+
+# Documento personale da colloquio, non parte del progetto
+architettura-backend.pdf
+
+# Log e file di sistema
+*.log
+.DS_Store
+Thumbs.db

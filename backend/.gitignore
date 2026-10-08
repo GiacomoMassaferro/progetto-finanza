@@ -1,0 +1,14 @@
+# Dipendenze
+node_modules/
+
+# Env (mai committare i segreti: usa .env.example come riferimento)
+.env
+!.env.example
+
+# Prisma
+prisma/migrations/**/migration.sql.backup
+
+# Log e OS
+*.log
+.DS_Store
+Thumbs.db

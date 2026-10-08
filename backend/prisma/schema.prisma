@@ -1,0 +1,180 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mysql"
+}
+
+// tabella utente
+model User {
+    id           BigInt   @id @default(autoincrement())
+    email        String   @unique
+    passwordHash String   @map("password_hash")
+    firstName    String?  @map("first_name")
+    lastName     String?  @map("last_name")
+    createdAt    DateTime @default(now()) @map("created_at")
+    updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+    // Soft delete: NULL = attivo, valorizzato = cancellato (recuperabile).
+    // Le query normali filtrano sempre `deletedAt: null` (vedi src/common/utils/softDelete.js).
+    deletedAt    DateTime? @map("deleted_at")
+
+    // relazioni
+    movementsCategories MovementsCategory[]
+    debts               Debt[]
+    transactions        Transaction[]
+    refreshTokens       RefreshToken[]
+
+    @@index([deletedAt])
+    @@map("users")
+}
+
+// Refresh token: un record per sessione, permette revoca e rotazione.
+// Eccezione al soft delete: sono credenziali effimere, i record scaduti
+// o revocati si eliminano fisicamente (vedi PLAN §4 D-10).
+model RefreshToken {
+    id        BigInt   @id @default(autoincrement())
+    userId    BigInt   @map("user_id")
+    // Hash SHA-256 del token (il token in chiaro non si salva mai).
+    tokenHash String   @unique @map("token_hash")
+    expiresAt DateTime @map("expires_at")
+    createdAt DateTime @default(now()) @map("created_at")
+
+    // Relazioni
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([expiresAt])
+    @@map("refresh_tokens")
+}
+
+// tabella categorie dei movimenti
+model MovementsCategory {
+    id        BigInt       @id @default(autoincrement())
+    userId    BigInt       @map("user_id")
+    name      String
+    type      CategoryType
+    color     String?
+    createdAt DateTime  @default(now()) @map("created_at")
+    updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+    // Soft delete: NULL = attivo, valorizzato = cancellato (recuperabile).
+    deletedAt DateTime? @map("deleted_at")
+
+    // relazioni
+    user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+    transactions Transaction[]
+
+    @@index([userId])
+    @@index([deletedAt])
+    @@map("movements_categories")
+}
+
+// tabella debiti e micro-debiti
+model Debt {
+    id              BigInt     @id @default(autoincrement())
+    userId          BigInt     @map("user_id")
+    creditorName    String     @map("creditor_name")
+    debtType        DebtType   @map("debt_type")
+    totalAmount     Decimal    @map("total_amount") @db.Decimal(10, 2)
+    remainingAmount Decimal    @map("remaining_amount") @db.Decimal(10, 2)
+    interestRate    Decimal    @default(0.00) @map("interest_rate") @db.Decimal(5, 2)
+    monthlyPayment  Decimal    @map("monthly_payment") @db.Decimal(10, 2)
+    dueDayOfMonth   Int?       @map("due_day_of_month")
+    startDate       DateTime   @map("start_date")
+    status          DebtStatus @default(ACTIVE)
+    createdAt       DateTime   @default(now()) @map("created_at")
+    updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at")
+    // Soft delete: NULL = attivo, valorizzato = cancellato (recuperabile).
+    deletedAt       DateTime?  @map("deleted_at")
+
+    // relazioni
+    user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+    payments DebtPayment[]
+
+    @@index([userId])
+    @@index([status])
+    @@index([deletedAt])
+    @@map("debts")
+}
+
+// rate e piani di reintro
+model DebtPayment {
+    id        BigInt        @id @default(autoincrement())
+    debtId    BigInt        @map("debt_id")
+    amount    Decimal       @db.Decimal(10, 2)
+    dueDate   DateTime      @map("due_date")
+    paidDate  DateTime?     @map("paid_date")
+    status    PaymentStatus @default(PENDING)
+    createdAt DateTime      @default(now()) @map("created_at")
+    updatedAt DateTime      @default(now()) @updatedAt @map("updated_at")
+    // Soft delete: NULL = attivo, valorizzato = cancellato (recuperabile).
+    deletedAt DateTime?     @map("deleted_at")
+
+    // Relazioni
+    debt         Debt          @relation(fields: [debtId], references: [id], onDelete: Cascade)
+    transactions Transaction[]
+
+    @@index([debtId])
+    @@index([status])
+    @@index([deletedAt])
+    @@map("debt_payments")
+}
+
+// transazioni (entrate/uscite)
+model Transaction {
+    id                  BigInt          @id @default(autoincrement())
+    userId              BigInt          @map("user_id")
+    movementsCategoryId BigInt          @map("movements_category_id")
+    debtPaymentId       BigInt?         @map("debt_payment_id") // Opzionale (Nullable)
+    amount              Decimal         @db.Decimal(10, 2)
+    type                TransactionType
+    description         String?         @db.Text
+    transactionDate     DateTime        @map("transaction_date")
+    createdAt           DateTime        @default(now()) @map("created_at")
+    updatedAt           DateTime        @default(now()) @updatedAt @map("updated_at")
+    // Soft delete: NULL = attivo, valorizzato = cancellato (recuperabile).
+    deletedAt           DateTime?       @map("deleted_at")
+
+    // Relazioni
+    user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+    movementsCategory MovementsCategory @relation(fields: [movementsCategoryId], references: [id], onDelete: Restrict)
+    debtPayment       DebtPayment?      @relation(fields: [debtPaymentId], references: [id], onDelete: SetNull)
+
+    @@index([userId])
+    @@index([movementsCategoryId])
+    @@index([debtPaymentId])
+    @@index([transactionDate])
+    @@index([deletedAt])
+    @@map("transactions")
+}
+
+// dati personalizzati (ENUM)
+enum CategoryType {
+    INCOME
+    EXPENSE
+}
+
+enum DebtType {
+    BNPL // Klarna, Scalapay, PayPal a rate
+    CREDIT_CARD
+    PERSONAL_LOAN
+    MORTGAGE
+    OTHER
+}
+
+enum DebtStatus {
+    ACTIVE
+    PAID_OFF
+    DEFAULTED
+}
+
+enum PaymentStatus {
+    PENDING
+    PAID
+    LATE
+}
+
+enum TransactionType {
+    INCOME
+    EXPENSE
+}
