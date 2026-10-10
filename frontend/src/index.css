@@ -1,0 +1,36 @@
+/* Stili globali: Tailwind + font del tema + numeri tabellari per le cifre
+   (evita lo "sfarfallio" quando i totali si ricalcolano, vedi DESIGN.md). */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #f8f9ff;
+  color: #0b1c30;
+}
+
+.tnum {
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+/* Transizioni sobrie del drawer mobile (200ms in entrata, 150ms in uscita). */
+@keyframes drawer-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes drawer-out {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.anim-drawer-in { animation: drawer-in 200ms ease-out; }
+.anim-drawer-out { animation: drawer-out 150ms ease-in; }
+.anim-backdrop-in { animation: backdrop-in 200ms ease-out; }
+.anim-backdrop-out { animation: backdrop-out 150ms ease-in; }

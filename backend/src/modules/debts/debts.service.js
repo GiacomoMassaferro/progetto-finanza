@@ -1,17 +1,13 @@
 import { AppError } from "../../common/utils/AppError.js";
+import { moneyFromCents, toCents, toMoneyString } from "../../common/utils/money.js";
 import { restore, softDelete, withAlive, withDeleted } from "../../common/utils/softDelete.js";
 import { prisma } from "../../config/prisma.js";
 
-// Converte centesimi interi in stringa a 2 decimali (niente float sui soldi).
-const toMoney = (cents) => (cents / 100).toFixed(2);
-// Converte stringa/Decimal in centesimi interi per i calcoli esatti.
-const toCents = (value) => Math.round(Number(value) * 100);
-
-// Converte la riga Prisma in oggetto API (BigInt/Decimal -> string, vedi PLAN I-03).
+// Converte la riga Prisma in oggetto API (BigInt -> string, soldi -> "0.00").
 function toSafePayment(row) {
     return {
         id: String(row.id),
-        amount: String(row.amount),
+        amount: toMoneyString(row.amount),
         dueDate: row.dueDate,
         paidDate: row.paidDate,
         status: row.status,
@@ -26,10 +22,10 @@ function toSafeDebt(row) {
         id: String(row.id),
         creditorName: row.creditorName,
         debtType: row.debtType,
-        totalAmount: String(row.totalAmount),
-        remainingAmount: String(row.remainingAmount),
-        interestRate: String(row.interestRate),
-        monthlyPayment: String(row.monthlyPayment),
+        totalAmount: toMoneyString(row.totalAmount),
+        remainingAmount: toMoneyString(row.remainingAmount),
+        interestRate: toMoneyString(row.interestRate),
+        monthlyPayment: toMoneyString(row.monthlyPayment),
         dueDayOfMonth: row.dueDayOfMonth,
         startDate: row.startDate,
         status: row.status,
@@ -247,14 +243,14 @@ export async function pay(userId, debtId, paymentId, data) {
     const result = await prisma.$transaction(async (tx) => {
         const paid = await tx.debtPayment.update({
             where: { id: payment.id },
-            data: { status: "PAID", paidDate, amount: toMoney(paidCents) },
+            data: { status: "PAID", paidDate, amount: moneyFromCents(paidCents) },
         });
         const transaction = await tx.transaction.create({
             data: {
                 userId: BigInt(userId),
                 movementsCategoryId: categoryId,
                 debtPaymentId: payment.id,
-                amount: toMoney(paidCents),
+                amount: moneyFromCents(paidCents),
                 type: "EXPENSE",
                 description: data.description ?? `Pagamento rata ${debt.creditorName}`,
                 transactionDate: paidDate,
@@ -263,7 +259,7 @@ export async function pay(userId, debtId, paymentId, data) {
         const updatedDebt = await tx.debt.update({
             where: { id: debt.id },
             data: {
-                remainingAmount: toMoney(remainingCents),
+                remainingAmount: moneyFromCents(remainingCents),
                 // Debito estinto: chiudi anche lo stato, senza intervento manuale.
                 ...(remainingCents === 0 ? { status: "PAID_OFF" } : {}),
             },
@@ -276,7 +272,7 @@ export async function pay(userId, debtId, paymentId, data) {
         payment: toSafePayment(result.paid),
         transaction: {
             id: String(result.transaction.id),
-            amount: String(result.transaction.amount),
+            amount: toMoneyString(result.transaction.amount),
             debtPaymentId: String(result.transaction.debtPaymentId),
         },
         debt: toSafeDebt(result.updatedDebt),

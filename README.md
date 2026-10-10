@@ -8,9 +8,10 @@ forte crescita.
 
 ## Stato
 
-Backend: fondamenta pronte (Express + Prisma + MySQL, health check, soft delete).
-Auth ed endpoint di dominio: da implementare. Frontend React + Vite: da creare
-(`frontend/` vuota). Dettagli tecnici e storico modifiche: vedi `PLAN.md`.
+Backend: fondamenta + auth + CRUD + dashboard + test (vedi sotto).
+Frontend React + Vite: fondamenta pronte (login, tema Stitch, client API),
+dashboard e pagine operative in arrivo. Dettagli tecnici e storico modifiche:
+vedi `PLAN.md`.
 
 ## Stack
 
@@ -75,12 +76,27 @@ l'assistenza può vedere e recuperare quelli cancellati. Dettagli in `PLAN.md` �
 - `/ready` in timeout → controlla `DATABASE_SSL="false"` nel `.env` (vedi `PLAN.md` §8).
 - pnpm chiede conferma TTY → `$env:CI = "true"` prima dei comandi.
 
+## Frontend (`frontend/`)
+
+React 19 + Vite + Tailwind col tema Stitch, mobile-first. Avvio:
+
+```powershell
+cd frontend
+Copy-Item .env.example .env   # opzionale: default = http://localhost:3000/api/v1
+pnpm install
+pnpm dev                      # http://localhost:5173 (il backend deve girare)
+```
+
+Login con `demo@example.com / DemoPass123` (dopo `pnpm db:seed` nel backend).
+Pagine: dashboard coi dati veri, transazioni, debiti/rate, categorie
+(tutte con cestino e ripristino). IA e obiettivi risparmio: segnaposto statici.
+
 ## Roadmap
 
-1. Auth JWT (register/login/refresh) + sicurezza (helmet, rate-limit)
-2. CRUD categorie, transazioni, debiti/rate + dashboard
-3. Validazione con zod, endpoint `trash`/`restore` per l'assistenza
-4. Frontend React + Vite
+1. Auth JWT (register/login/refresh) + sicurezza (helmet, rate-limit) ✅
+2. CRUD categorie, transazioni, debiti/rate + dashboard ✅
+3. Validazione con zod, endpoint `trash`/`restore` per l'assistenza ✅
+4. Frontend React + Vite (completo: dashboard, transazioni, debiti, categorie)
 5. Suggerimenti IA per estinzione debiti e risparmi
 
 ## Licenza
@@ -98,9 +114,10 @@ borrowing is easy, more savings in a time of sharply rising prices.
 
 ## Status
 
-Backend: foundation ready (Express + Prisma + MySQL, health checks, soft delete).
-Auth and domain endpoints: to be implemented. React + Vite frontend: to be created
-(`frontend/` empty). Technical details and change history: see `PLAN.md`.
+Backend: foundation + auth + CRUD + dashboard + tests (see below).
+React + Vite frontend: foundation ready (login, Stitch theme, API client),
+dashboard and operational pages coming. Technical details and change history:
+see `PLAN.md`.
 
 ## Stack
 
@@ -165,12 +182,27 @@ ones. Details in `PLAN.md` §3.3.
 - `/ready` timing out → check `DATABASE_SSL="false"` in `.env` (see `PLAN.md` §8).
 - pnpm asking for TTY confirmation → `$env:CI = "true"` before commands.
 
+## Frontend (`frontend/`)
+
+React 19 + Vite + Tailwind with the Stitch theme, mobile-first. Start:
+
+```powershell
+cd frontend
+Copy-Item .env.example .env   # optional: default = http://localhost:3000/api/v1
+pnpm install
+pnpm dev                      # http://localhost:5173 (backend must run)
+```
+
+Login with `demo@example.com / DemoPass123` (after `pnpm db:seed` in backend).
+Pages: real-data dashboard, transactions, debts/installments, categories
+(all with trash and restore). AI and savings goals: static placeholders.
+
 ## Roadmap
 
-1. JWT auth (register/login/refresh) + hardening (helmet, rate-limit)
-2. Categories, transactions, debts/installments CRUD + dashboard
-3. Zod validation, `trash`/`restore` endpoints for support
-4. React + Vite frontend
+1. JWT auth (register/login/refresh) + hardening (helmet, rate-limit) ✅
+2. Categories, transactions, debts/installments CRUD + dashboard ✅
+3. Zod validation, `trash`/`restore` endpoints for support ✅
+4. React + Vite frontend (done: dashboard, transactions, debts, categories)
 5. AI suggestions for debt payoff and savings
 
 ## License

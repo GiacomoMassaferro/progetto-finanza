@@ -9,7 +9,7 @@
 | Mission | Portal that helps anyone manage debt and save money; AI provides payoff and saving suggestions without worsening the user's finances |
 | Status | Backend foundation done — no auth, no business endpoints yet |
 | Frontend | React + Vite (planned, `frontend/` currently empty) |
-| Last updated | 2026-10-08 |
+| Last updated | 2026-10-10 |
 | Maintainer | @giaco |
 
 ---
@@ -35,6 +35,8 @@
 | Tokens | jsonwebtoken | 9.0.3 | access 15m + refresh 7d, rotation with single use |
 | Validation | zod | 4.6.5 | all `*.schemas.js` via shared `parseOr400` helper → uniform `AppError(400, details[])` |
 | Rate limit | express-rate-limit | 8.7.1 | 300/15min global on `/api`, 30/15min on `/api/v1/auth`, JSON 429 |
+| Tests (dev) | vitest 5.0.3 + supertest 7.3.1 | `pnpm test` — integration vs real MySQL, throwaway `test-*` users, I-06 cleanup |
+| Frontend | React 19 + Vite 8 + react-router 7 + Tailwind 3.4 | JS only, mobile-first, theme tokens from Stitch DESIGN.md, JWT client with auto-refresh |
 | ORM | Prisma | 7.10.0 | `prisma-client-js` generator, MySQL provider |
 | DB driver | @prisma/adapter-mariadb (mariadb connector) | 7.10.0 (3.4.5) | Prisma 7 requires a driver adapter |
 | DB | MySQL | 8.4.10 (local) | `utf8mb4_unicode_ci` |
@@ -162,10 +164,32 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-08 | D-10 | Refresh rotation with DB-backed single-use tokens; hard delete allowed only for consumed/expired tokens | rotation kills reuse attacks; tokens are ephemeral credentials (not user data), so physical delete on consume/expiry is correct hygiene — sole exception to the soft-delete rule |
 | 2026-10-08 | D-11 | zod replaces hand-written validation (same `validateX` interface, shared `parseOr400` → `AppError(400)`) | declarative schemas, uniform `{ field: reason }` details, controllers untouched |
 | 2026-10-08 | D-12 | debt restore revives installments too (mirror of remove, one tx) | trash/restore must be symmetric: deleting hides both, restoring revives both |
+| 2026-10-08 | D-13 | shared `src/common/utils/money.js` — cents for math, `"0.00"` strings for API | `String(Decimal("300.00"))` yields `"300"` (incident I-07); single helper guarantees exact uniform amounts everywhere |
+| 2026-10-09 | D-14 | frontend React+Vite+Tailwind3 (JS only, mobile-first), Stitch token names kept 1:1, `src/lib/api.js` with single-retry refresh | reusing Stitch class names makes porting markup direct; refresh-once-then-logout keeps sessions alive without loops |
 
 ## 5. Changelog (newest first — every entry dated)
 
 
+- **2026-10-10** — Drawer animation: subtle slide-in (200ms) + backdrop fade, quick slide-out (150ms) via CSS keyframes; close on backdrop/×/Esc/route change.
+- **2026-10-10** — Mobile drawer menu replaces bottom tab bar (`AppShell`):
+
+
+- **2026-10-10** — Mobile drawer menu replaces bottom tab bar (`AppShell`): hamburger in header (mobile only), slide-in panel with nav + account + logout, backdrop/Esc/route-change close; desktop top nav unchanged.
+- **2026-10-10** — Frontend fix (I-08):
+
+
+- **2026-10-10** — Frontend fix (I-08): lists crashed with `items.find of undefined` — `api()` dropped `meta` and pages read `.data` off the array; added `apiPaged()` returning `{ items, meta }`, pages adapted; build green, servers verified.
+
+
+- **2026-10-10** — Frontend F3: operational pages Transactions (filters, create with comma-dot normalization, trash/restore), Debts (create, installments, pay with category, trash/restore with installments), Categories (create, inline rename, trash/restore, account box); Stitch sources deleted after porting.
+
+
+- **2026-10-10** — Frontend F2: responsive Dashboard (one page, mobile-first) wired to real data — month selector, 4 KPIs, debts with payoff progress, upcoming/overdue payments, recent transactions; AI advisor + savings goals as marked static placeholders; demo login verified with live summary.
+- **2026-10-10** — Frontend F1: Vite+React+router+Tailwind3 scaffold (JS only, mobile-first), theme from Stitch DESIGN.md (same class names), `src/lib/api.js` (JWT + single-retry refresh), AuthContext, login/register, protected Dashboard placeholder; `pnpm build` green, dev servers verified.
+- **2026-10-08** — Automated tests:
+
+
+- **2026-10-08** — Automated tests: vitest + supertest (`tests/`: auth 7, categories 6, pay 1), real-MySQL integration with throwaway users + I-06 cleanup; found incident I-07 (Decimal→string normalization) fixed via shared `money.js`; 14/14 green, DB clean (demo user only).
 - **2026-10-08** — Backend Step 8 (finishing): zod replaces manual validation (same interface, `parseOr400` helper); `express-rate-limit` (300/15min global, 30/15min auth, JSON 429); `trash`+`restore` on categories/transactions/debts (debt restore revives installments); malformed JSON now 400 (was 500); `prisma/seed.js` demo + `db:seed` (idempotent); live verified (zod 400 details, 30×401 then 429, trash→restore cycles); test users cleaned, demo user kept.
 - **2026-10-08** — Backend Step 7 (dashboard): `src/modules/dashboard/` with `GET /summary?month=` (groupBy aggregates, integer-cent math, per-category totals, active-debt sums, overdue + upcoming payments); 8 live checks passed (month filter excludes September row, empty month zeros, 400/401); test data cleaned.
 - **2026-10-08** — Backend Step 6 (debts): `src/modules/debts/` (debts CRUD + installments CRUD + atomic `pay` creating the linked transaction, scaling remainder, auto `PAID_OFF` at zero; debt soft delete cascades to installments in one tx); 14 live checks passed (409 double-pay, 404 isolation, I-06 purge order for cleanup); test data cleaned.
@@ -200,6 +224,7 @@ pnpm db:validate        # schema valid?
 pnpm db:migrate         # apply pending migrations (needs shadow DB to exist & be empty)
 pnpm db:generate        # regenerate client
 pnpm dev                # node --watch src/server.js → http://localhost:3000
+pnpm test               # vitest suite (needs MySQL up; uses throwaway test-* users)
 ```
 
 Startup order: MySQL (3306) → `pnpm dev` → check `/health` then `/ready`.
@@ -234,6 +259,16 @@ Prereqs: Node 24, pnpm 11, MySQL 8.x with databases `express_finance` + empty `e
 - **Cause:** soft-deleted rows still exist; `Transaction→MovementsCategory Restrict` (plus category→user cascade blocked by live transaction rows) forbids the delete. Restrict working as designed.
 - **Fix / rule:** hard purge order is mandatory — transactions → debt_payments → debts → categories → user. Support must follow this order for GDPR purges; normal flows never hard-delete (see §9).
 
+### I-07 (2026-10-08) — amounts returned as `"300"` instead of `"300.00"`
+- **Symptoms:** automated test expected `"300.00"`, API returned `"300"`.
+- **Cause:** `String(Decimal("300.00"))` normalizes away trailing zeros (Decimal.js `toString`).
+- **Fix:** shared `src/common/utils/money.js` (`toCents`/`moneyFromCents`/`toMoneyString`); all services return `"0.00"`-format strings. Found by the test suite — exactly what it is for.
+
+### I-08 (2026-10-10) — frontend lists crash: `Cannot read properties of undefined (reading 'find')`
+- **Symptoms:** all data pages (`/debts`, `/transactions`, `/categories`) blank; console points at `items.find`.
+- **Cause:** list endpoints answer `{ data: [], meta }` but frontend `api()` returned only `payload.data` (dropping `meta`), and pages read `.data` off that array → `undefined`.
+- **Fix:** new `apiPaged()` helper returning `{ items, meta }` in `src/lib/api.js`; pages adapted (`res.items`/`res.meta`); Dashboard simplified the same way. Rule: single-resource helpers return `data`, list helpers return `{ items, meta }`.
+
 ## 9. Backup & recovery
 
 - **DB backup (run before every migration in prod):** `mysqldump -h HOST -u USER -p express_finance > backup_YYYYMMDD.sql`.
@@ -253,8 +288,8 @@ Prereqs: Node 24, pnpm 11, MySQL 8.x with databases `express_finance` + empty `e
 1. **Auth** — ✅ done 2026-10-08 (`bcryptjs` + JWT access 15m + refresh 7d with rotation; `helmet`/`cors`/`rate-limit` done).
 2. **Domain CRUD** — categories ✅ 2026-10-08, transactions ✅ 2026-10-08, debts+payments ✅ 2026-10-08, `dashboard/summary` ✅ 2026-10-08.
 3. **Validation & support** — zod ✅ 2026-10-08, `trash`/`restore` ✅ 2026-10-08, `rate-limit` ✅ 2026-10-08, seed ✅ 2026-10-08.
-4. **Tooling** — vitest + supertest (auth + 1 CRUD minimum), Dockerfile/compose.
-5. **Frontend** — React + Vite scaffold in `frontend/`, API client with refresh flow.
+4. **Tooling** — vitest + supertest ✅ 2026-10-08 (14 tests, `pnpm test`); Docker/compose still open.
+5. **Frontend** — F1 ✅, F2 ✅, F3 ✅ 2026-10-10 (transactions/debts/categories pages wired; Stitch sources deleted).
 6. **AI layer** — payoff/saving suggestions (scope TBD after tracking works).
 
 ## 12. Glossary

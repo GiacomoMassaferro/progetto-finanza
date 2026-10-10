@@ -1,15 +1,16 @@
 import { AppError } from "../../common/utils/AppError.js";
+import { toMoneyString } from "../../common/utils/money.js";
 import { restore, softDelete, withAlive, withDeleted } from "../../common/utils/softDelete.js";
 import { prisma } from "../../config/prisma.js";
 
 // Categoria inclusa nelle risposte: al render serve il nome senza altre chiamate.
 const CATEGORY_SELECT = { select: { id: true, name: true, type: true, color: true } };
 
-// Converte la riga Prisma in oggetto API (BigInt/Decimal -> string, vedi PLAN I-03).
+// Converte la riga Prisma in oggetto API (BigInt -> string, soldi -> "0.00").
 function toSafeTransaction(row) {
     return {
         id: String(row.id),
-        amount: String(row.amount),
+        amount: toMoneyString(row.amount),
         type: row.type,
         description: row.description,
         transactionDate: row.transactionDate,

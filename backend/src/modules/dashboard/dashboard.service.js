@@ -1,9 +1,6 @@
+import { moneyFromCents, toCents, toMoneyString } from "../../common/utils/money.js";
 import { withAlive } from "../../common/utils/softDelete.js";
 import { prisma } from "../../config/prisma.js";
-
-// Calcoli in centesimi interi: niente float sui soldi.
-const toCents = (value) => Math.round(Number(value ?? 0) * 100);
-const toMoney = (cents) => (cents / 100).toFixed(2);
 
 // Riepilogo del mese per l'utente: entrate/uscite, saldo, spesa per
 // categoria, situazione debiti e rate in scadenza. Solo record attivi.
@@ -47,7 +44,7 @@ export async function summary(userId, { month, from, to }) {
             category: cat
                 ? { id: String(cat.id), name: cat.name, type: cat.type, color: cat.color }
                 : { id: String(row.movementsCategoryId), name: "(eliminata)", type: null, color: null },
-            total: toMoney(toCents(row._sum.amount)),
+            total: moneyFromCents(toCents(row._sum.amount)),
         };
     });
 
@@ -84,21 +81,21 @@ export async function summary(userId, { month, from, to }) {
 
     return {
         month,
-        income: toMoney(incomeCents),
-        expenses: toMoney(expenseCents),
-        balance: toMoney(incomeCents - expenseCents),
+        income: moneyFromCents(incomeCents),
+        expenses: moneyFromCents(expenseCents),
+        balance: moneyFromCents(incomeCents - expenseCents),
         transactions: count,
         byCategory: byCategoryOut,
         debts: {
             active: debts._count,
-            totalRemaining: toMoney(toCents(debts._sum.remainingAmount)),
-            totalMonthly: toMoney(toCents(debts._sum.monthlyPayment)),
+            totalRemaining: moneyFromCents(toCents(debts._sum.remainingAmount)),
+            totalMonthly: moneyFromCents(toCents(debts._sum.monthlyPayment)),
         },
         payments: {
             overdue,
             upcoming: upcoming.map((p) => ({
                 id: String(p.id),
-                amount: String(p.amount),
+                amount: toMoneyString(p.amount),
                 dueDate: p.dueDate,
                 debt: { id: String(p.debt.id), creditorName: p.debt.creditorName },
             })),
