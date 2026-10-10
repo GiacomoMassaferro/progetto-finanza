@@ -28,6 +28,16 @@ vedi `PLAN.md`.
 - Database `express_finance` + shadow database vuoto `express_finance_shadow`
 - Utente MySQL `prisma_user` con accesso a entrambi
 
+## Avvio rapido (tutto insieme)
+
+```powershell
+pnpm install:all   # una volta sola: dipendenze backend + frontend
+pnpm start         # backend :3000 + frontend :5173 insieme
+```
+
+Poi apri `http://localhost:5173` e accedi con `demo@example.com / DemoPass123`
+(dopo `pnpm --dir backend db:seed`).
+
 ## Avvio rapido (backend)
 
 ```powershell
@@ -133,6 +143,16 @@ see `PLAN.md`.
 - Node.js 24, pnpm 11, MySQL 8 listening on `localhost:3306`
 - `express_finance` database + empty `express_finance_shadow` database
 - `prisma_user` MySQL user with access to both
+
+## Quickstart (all together)
+
+```powershell
+pnpm install:all   # once: backend + frontend dependencies
+pnpm start         # backend :3000 + frontend :5173 together
+```
+
+Then open `http://localhost:5173` and login with `demo@example.com / DemoPass123`
+(after `pnpm --dir backend db:seed`).
 
 ## Quickstart (backend)
 

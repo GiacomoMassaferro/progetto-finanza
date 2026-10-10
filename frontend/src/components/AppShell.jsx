@@ -1,18 +1,21 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthContext.jsx";
+import LanguageSelector from "./LanguageSelector.jsx";
 
 // Guscio app: header fisso + contenuto + nav desktop in alto.
 // Su mobile la navigazione è un menù a scomparsa (hamburger -> drawer
 // laterale): niente barra fissa in basso, pagina pulita.
 const TABS = [
-  { to: "/", label: "Dashboard" },
-  { to: "/debts", label: "Rientro" },
-  { to: "/transactions", label: "Transazioni" },
-  { to: "/categories", label: "Categorie" },
+  { to: "/", key: "dashboard" },
+  { to: "/debts", key: "debts" },
+  { to: "/transactions", key: "transactions" },
+  { to: "/categories", key: "categories" },
 ];
 
 export default function AppShell({ children }) {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -62,7 +65,7 @@ export default function AppShell({ children }) {
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
-              aria-label="Apri menù"
+              aria-label={t("nav.openMenu")}
               className="md:hidden w-10 h-10 rounded-lg flex flex-col items-center justify-center gap-1 border border-outline-variant"
             >
               <span className="block w-5 h-0.5 bg-on-surface" />
@@ -70,34 +73,37 @@ export default function AppShell({ children }) {
               <span className="block w-5 h-0.5 bg-on-surface" />
             </button>
             <Link to="/" className="flex items-center gap-space-sm min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
-              <span className="font-headline-sm text-headline-sm text-on-primary">P</span>
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="font-headline-sm text-headline-sm text-on-surface truncate">Project Finance</span>
-              <span className="font-label-xs text-label-xs text-on-surface-variant uppercase">Solvenza algoritmica</span>
-            </div>
-          </Link>
+              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
+                <span className="font-headline-sm text-headline-sm text-on-primary">P</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-headline-sm text-headline-sm text-on-surface truncate">Project Finance</span>
+                <span className="font-label-xs text-label-xs text-on-surface-variant uppercase">{t("nav.brandSubtitle")}</span>
+              </div>
+            </Link>
           </div>
           <nav className="hidden md:flex items-center gap-space-sm">
-            {TABS.map((t) => (
+            {TABS.map((tab) => (
               <Link
-                key={t.to}
-                to={t.to}
+                key={tab.to}
+                to={tab.to}
                 className={`px-3 py-1.5 rounded-lg font-label-md text-label-md ${
-                  location.pathname === t.to ? "bg-surface-container text-on-surface" : "text-on-surface-variant"
+                  location.pathname === tab.to ? "bg-surface-container text-on-surface" : "text-on-surface-variant"
                 }`}
               >
-                {t.label}
+                {t(`nav.${tab.key}`)}
               </Link>
             ))}
           </nav>
           <div className="flex items-center gap-space-xs shrink-0">
+            <div className="hidden md:block">
+              <LanguageSelector />
+            </div>
             <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center" title={user?.email}>
               <span className="font-label-md text-label-md text-on-primary">{initial}</span>
             </div>
             <button type="button" onClick={onLogout} className="hidden md:block h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md">
-              Esci
+              {t("nav.logout")}
             </button>
           </div>
         </div>
@@ -113,25 +119,26 @@ export default function AppShell({ children }) {
           <aside className={`absolute left-0 top-0 h-full w-72 max-w-[85vw] bg-surface-container-lowest border-r border-hairline p-space-md flex flex-col ${closing ? "anim-drawer-out" : "anim-drawer-in"}`}>
             <div className="flex items-center justify-between">
               <p className="font-headline-sm text-headline-sm text-on-surface">Project Finance</p>
-              <button type="button" onClick={closeMenu} aria-label="Chiudi menù" className="w-10 h-10 rounded-lg border border-outline-variant font-headline-sm text-headline-sm">×</button>
+              <button type="button" onClick={closeMenu} aria-label={t("nav.closeMenu")} className="w-10 h-10 rounded-lg border border-outline-variant font-headline-sm text-headline-sm">×</button>
             </div>
             <nav className="flex flex-col gap-space-xs mt-space-lg">
-              {TABS.map((t) => (
+              {TABS.map((tab) => (
                 <Link
-                  key={t.to}
-                  to={t.to}
+                  key={tab.to}
+                  to={tab.to}
                   className={`px-3 py-2.5 rounded-lg font-headline-sm text-headline-sm ${
-                    location.pathname === t.to ? "bg-surface-container text-on-surface" : "text-on-surface-variant"
+                    location.pathname === tab.to ? "bg-surface-container text-on-surface" : "text-on-surface-variant"
                   }`}
                 >
-                  {t.label}
+                  {t(`nav.${tab.key}`)}
                 </Link>
               ))}
             </nav>
-            <div className="mt-auto border-t border-hairline pt-space-sm">
+            <div className="mt-auto border-t border-hairline pt-space-sm flex flex-col gap-space-sm">
               <p className="font-body-sm text-body-sm text-on-surface-variant truncate">{user?.email}</p>
-              <button type="button" onClick={onLogout} className="mt-space-xs h-10 w-full rounded-lg border border-outline-variant font-label-md text-label-md">
-                Esci
+              <LanguageSelector compact />
+              <button type="button" onClick={onLogout} className="h-10 w-full rounded-lg border border-outline-variant font-label-md text-label-md">
+                {t("nav.logout")}
               </button>
             </div>
           </aside>

@@ -27,6 +27,9 @@ const loginSchema = z.object({ email: emailSchema, password: passwordSchema });
 // Body di POST /auth/refresh: il refresh token da ruotare.
 const refreshSchema = z.object({ refreshToken: z.string().min(1, "refreshToken mancante") });
 
+// Body di PATCH /auth/me: solo la lingua (stesso set dei JSON frontend).
+const meUpdateSchema = z.object({ language: z.enum(["en", "it", "es", "de"]) });
+
 export function validateRegister(body) {
     const parsed = parseOr400(registerSchema, body, "Dati di registrazione non validi");
     return { ...parsed, firstName: parsed.firstName || null, lastName: parsed.lastName || null };
@@ -38,4 +41,8 @@ export function validateLogin(body) {
 
 export function validateRefresh(body) {
     return parseOr400(refreshSchema, body, "Dati di rinnovo non validi");
+}
+
+export function validateMeUpdate(body) {
+    return parseOr400(meUpdateSchema, body, "Dati profilo non validi");
 }

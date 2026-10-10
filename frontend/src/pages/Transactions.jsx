@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import AppShell from "../components/AppShell.jsx";
 import { ErrorAlert, Field, PrimaryButton, Select, TextInput, TrashToggle } from "../components/forms.jsx";
 import { Card, SectionTitle } from "../components/ui.jsx";
@@ -8,6 +9,7 @@ import { formatEUR, formatShortDate } from "../lib/format.js";
 // Registro movimenti: filtri (tipo, categoria), nuovo movimento,
 // cancellazione soft con cestino e ripristino.
 export default function Transactions() {
+  const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [meta, setMeta] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -72,7 +74,7 @@ export default function Transactions() {
 
   // Cancella (soft) o ripristina, poi ricarica la vista corrente.
   async function onDelete(id) {
-    if (!window.confirm("Spostare nel cestino? Potrai ripristinarla.")) return;
+    if (!window.confirm(t("common.confirmTrash"))) return;
     setError(null);
     try {
       await transactionsApi.remove(id);
@@ -99,16 +101,16 @@ export default function Transactions() {
 
   return (
     <AppShell>
-      <SectionTitle kicker="Movimenti" title="Transazioni" action={<button type="button" onClick={() => setShowForm((v) => !v)} className="h-10 px-3.5 rounded-lg bg-primary font-label-md text-label-md text-on-primary">+ Nuova</button>} />
+      <SectionTitle kicker={t("transactions.kicker")} title={t("transactions.title")} action={<button type="button" onClick={() => setShowForm((v) => !v)} className="h-10 px-3.5 rounded-lg bg-primary font-label-md text-label-md text-on-primary">{t("transactions.new")}</button>} />
 
       <div className="flex flex-col md:flex-row gap-space-sm mt-space-md">
-        <Select value={type} onChange={(e) => setType(e.target.value)} aria-label="Filtro tipo">
-          <option value="">Entrate + uscite</option>
-          <option value="INCOME">Solo entrate</option>
-          <option value="EXPENSE">Solo uscite</option>
+        <Select value={type} onChange={(e) => setType(e.target.value)} aria-label={t("transactions.type")}>
+          <option value="">{t("transactions.filterAll")}</option>
+          <option value="INCOME">{t("transactions.filterIncome")}</option>
+          <option value="EXPENSE">{t("transactions.filterExpense")}</option>
         </Select>
-        <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="Filtro categoria">
-          <option value="">Tutte le categorie</option>
+        <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label={t("transactions.category")}>
+          <option value="">{t("transactions.filterCategory")}</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
@@ -127,61 +129,61 @@ export default function Transactions() {
         <Card className="mt-space-md">
           <form onSubmit={onCreate} className="flex flex-col gap-space-sm">
             <div className="grid grid-cols-2 gap-space-sm">
-              <Field label="IMPORTO €">
-                <TextInput required inputMode="decimal" placeholder="45,50" value={form.amount} onChange={(e) => set("amount", e.target.value)} />
+              <Field label={t("transactions.amount")}>
+                <TextInput required inputMode="decimal" placeholder="45.50" value={form.amount} onChange={(e) => set("amount", e.target.value)} />
               </Field>
-              <Field label="TIPO">
+              <Field label={t("transactions.type")}>
                 <Select value={form.type} onChange={(e) => set("type", e.target.value)}>
-                  <option value="EXPENSE">Uscita</option>
-                  <option value="INCOME">Entrata</option>
+                  <option value="EXPENSE">{t("transactions.expense")}</option>
+                  <option value="INCOME">{t("transactions.income")}</option>
                 </Select>
               </Field>
             </div>
-            <Field label="CATEGORIA">
+            <Field label={t("transactions.category")}>
               <Select required value={form.movementsCategoryId} onChange={(e) => set("movementsCategoryId", e.target.value)}>
-                <option value="">Scegli…</option>
+                <option value="">{t("transactions.choose")}</option>
                 {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.type === "INCOME" ? "entrata" : "uscita"})</option>
+                  <option key={c.id} value={c.id}>{c.name} ({c.type === "INCOME" ? t("transactions.income").toLowerCase() : t("transactions.expense").toLowerCase()})</option>
                 ))}
               </Select>
             </Field>
             <div className="grid grid-cols-2 gap-space-sm">
-              <Field label="DATA">
+              <Field label={t("transactions.date")}>
                 <TextInput required type="date" value={form.transactionDate} onChange={(e) => set("transactionDate", e.target.value)} />
               </Field>
-              <Field label="DESCRIZIONE">
-                <TextInput placeholder="Facoltativa" value={form.description} onChange={(e) => set("description", e.target.value)} />
+              <Field label={t("transactions.description")}>
+                <TextInput placeholder={t("transactions.descriptionPh")} value={form.description} onChange={(e) => set("description", e.target.value)} />
               </Field>
             </div>
-            <PrimaryButton busy={busy}>Salva movimento</PrimaryButton>
+            <PrimaryButton busy={busy}>{t("transactions.save")}</PrimaryButton>
           </form>
         </Card>
       )}
 
       <Card className="mt-space-md">
         {items.length === 0 ? (
-          <p className="font-body-md text-body-md text-on-surface-variant">{showTrash ? "Cestino vuoto." : "Nessun movimento con questi filtri."}</p>
+          <p className="font-body-md text-body-md text-on-surface-variant">{showTrash ? t("common.emptyTrash") : t("transactions.noResults")}</p>
         ) : (
           <ul className="flex flex-col divide-y divide-hairline">
-            {items.map((t) => (
-              <li key={t.id} className="flex items-center gap-space-sm py-space-sm">
+            {items.map((item) => (
+              <li key={item.id} className="flex items-center gap-space-sm py-space-sm">
                 <div className="flex-1 min-w-0">
-                  <p className="font-body-md text-body-md text-on-surface truncate">{t.description ?? t.category?.name ?? "Movimento"}</p>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">{formatShortDate(t.transactionDate)} · {t.category?.name ?? "—"}</p>
+                  <p className="font-body-md text-body-md text-on-surface truncate">{item.description ?? item.category?.name ?? t("dashboard.movementFallback")}</p>
+                  <p className="font-body-sm text-body-sm text-on-surface-variant">{formatShortDate(item.transactionDate)} · {item.category?.name ?? "—"}</p>
                 </div>
-                <p className={`tnum font-body-md text-body-md shrink-0 ${t.type === "INCOME" ? "text-tertiary" : "text-on-surface"}`}>
-                  {t.type === "INCOME" ? "+" : "−"}{formatEUR(t.amount)}
+                <p className={`tnum font-body-md text-body-md shrink-0 ${item.type === "INCOME" ? "text-tertiary" : "text-on-surface"}`}>
+                  {item.type === "INCOME" ? "+" : "−"}{formatEUR(item.amount)}
                 </p>
                 {showTrash ? (
-                  <button type="button" onClick={() => onRestore(t.id)} className="h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md shrink-0">Ripristina</button>
+                  <button type="button" onClick={() => onRestore(item.id)} className="h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md shrink-0">{t("common.restore")}</button>
                 ) : (
-                  <button type="button" onClick={() => onDelete(t.id)} className="h-9 px-3 rounded-lg border border-error-container text-on-error-container font-label-md text-label-md shrink-0">Cestina</button>
+                  <button type="button" onClick={() => onDelete(item.id)} className="h-9 px-3 rounded-lg border border-error-container text-on-error-container font-label-md text-label-md shrink-0">{t("common.delete")}</button>
                 )}
               </li>
             ))}
           </ul>
         )}
-        {meta && <p className="mt-space-sm font-body-sm text-body-sm text-on-surface-variant">Totale: {meta.total}</p>}
+        {meta && <p className="mt-space-sm font-body-sm text-body-sm text-on-surface-variant">{t("common.total")} {meta.total}</p>}
       </Card>
     </AppShell>
   );

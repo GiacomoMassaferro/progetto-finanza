@@ -73,6 +73,24 @@ describe("GET /api/v1/auth/me", () => {
     });
 });
 
+describe("PATCH /api/v1/auth/me", () => {
+    test("salva la lingua e la restituisce (default en)", async () => {
+        const { user, tokens } = await trackedUser("auth-lang");
+        expect(user.language).toBe("en");
+        const updated = await api
+            .patch("/api/v1/auth/me")
+            .set(bearer(tokens.accessToken))
+            .send({ language: "it" })
+            .expect(200);
+        expect(updated.body.data.user.language).toBe("it");
+    });
+
+    test("400 con lingua non supportata", async () => {
+        const { tokens } = await trackedUser("auth-lang-bad");
+        await api.patch("/api/v1/auth/me").set(bearer(tokens.accessToken)).send({ language: "fr" }).expect(400);
+    });
+});
+
 describe("POST /api/v1/auth/refresh", () => {
     test("ruota i token e invalida quello vecchio (uso singolo)", async () => {
         const { tokens } = await trackedUser("auth-ref");

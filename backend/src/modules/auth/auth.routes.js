@@ -11,5 +11,6 @@ router.post("/refresh", authController.refresh);
 
 // Rotta protetta: richiede `Authorization: Bearer <accessToken>`.
 router.get("/me", auth, authController.me);
+router.patch("/me", auth, authController.updateMe);
 
 export default router;

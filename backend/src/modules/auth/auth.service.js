@@ -28,6 +28,7 @@ function toSafeUser(user) {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        language: user.language,
         createdAt: user.createdAt,
     };
 }
@@ -120,6 +121,18 @@ export async function me(userId) {
         throw new AppError(404, "Utente non trovato");
     }
     return toSafeUser(user);
+}
+
+// Aggiorna il profilo (oggi: solo la lingua preferita).
+export async function updateMe(userId, data) {
+    const user = await prisma.user.findFirst({
+        where: withAlive({ id: BigInt(userId) }),
+    });
+    if (!user) {
+        throw new AppError(404, "Utente non trovato");
+    }
+    const updated = await prisma.user.update({ where: { id: user.id }, data });
+    return toSafeUser(updated);
 }
 
 // Emette la coppia access + refresh per un utente.

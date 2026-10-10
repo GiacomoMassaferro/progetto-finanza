@@ -103,6 +103,8 @@ export const authApi = {
   // { email, password } -> { user, tokens }.
   login: (input) => api("/auth/login", { method: "POST", body: input }),
   me: (token) => api("/auth/me", { token }),
+  // Salva la lingua preferita nel profilo (segue l'utente su ogni dispositivo).
+  updateMe: (input) => api("/auth/me", { method: "PATCH", body: input }),
 };
 
 // --- Risorse protette (il token lo mette api/apiPaged da sole) ---

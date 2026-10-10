@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthContext.jsx";
 import AiAdvisor from "../components/AiAdvisor.jsx";
 import AppShell from "../components/AppShell.jsx";
@@ -12,6 +13,7 @@ import { currentMonth, formatEUR, formatMonthLabel, formatShortDate, shiftMonth 
 // Segue i due layout Stitch: stessi blocchi (benvenuto, KPI, IA, rientro,
 // risparmi, scadenze, transazioni), dati veri tranne IA e risparmi.
 export default function Dashboard() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [month, setMonth] = useState(currentMonth());
   const [summary, setSummary] = useState(null);
@@ -26,11 +28,11 @@ export default function Dashboard() {
     setLoading(true);
     setError("");
     Promise.all([dashboardApi.summary(month), debtsApi.list({ limit: 3 }), transactionsApi.list({ limit: 4 })])
-      .then(([s, d, t]) => {
+      .then(([s, d, tr]) => {
         if (cancelled) return;
         setSummary(s);
         setDebts(d.items);
-        setRecent(t.items.slice(0, 4));
+        setRecent(tr.items.slice(0, 4));
       })
       .catch((err) => !cancelled && setError(err.message))
       .finally(() => !cancelled && setLoading(false));
@@ -51,14 +53,14 @@ export default function Dashboard() {
       <div className="flex items-start justify-between gap-space-sm">
         <div>
           <h1 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-surface">
-            Bentornato{user?.firstName ? `, ${user.firstName}` : ""}
+            {t("dashboard.welcome")}{user?.firstName ? `, ${user.firstName}` : ""}
           </h1>
-          <p className="font-body-md text-body-md text-on-surface-variant">Panoramica finanziaria di oggi</p>
+          <p className="font-body-md text-body-md text-on-surface-variant">{t("dashboard.subtitle")}</p>
         </div>
         <div className="flex items-center gap-space-xs shrink-0">
-          <button type="button" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Mese precedente" className="h-10 w-10 rounded-lg border border-outline-variant font-headline-sm text-headline-sm">‹</button>
+          <button type="button" onClick={() => setMonth(shiftMonth(month, -1))} aria-label={t("dashboard.prevMonth")} className="h-10 w-10 rounded-lg border border-outline-variant font-headline-sm text-headline-sm">‹</button>
           <span className="font-label-md text-label-md text-on-surface min-w-24 text-center">{summary ? formatMonthLabel(summary.month) : "…"}</span>
-          <button type="button" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Mese successivo" className="h-10 w-10 rounded-lg border border-outline-variant font-headline-sm text-headline-sm">›</button>
+          <button type="button" onClick={() => setMonth(shiftMonth(month, 1))} aria-label={t("dashboard.nextMonth")} className="h-10 w-10 rounded-lg border border-outline-variant font-headline-sm text-headline-sm">›</button>
         </div>
       </div>
 
@@ -69,33 +71,37 @@ export default function Dashboard() {
       )}
 
       {loading ? (
-        <p className="mt-space-lg font-body-md text-body-md text-on-surface-variant">Caricamento dati…</p>
+        <p className="mt-space-lg font-body-md text-body-md text-on-surface-variant">{t("common.loadingData")}</p>
       ) : (
         summary && (
           <div className="flex flex-col gap-space-lg mt-space-md">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-space-sm md:gap-space-md">
-              <KpiCard label="Debito residuo" value={formatEUR(summary.debts.totalRemaining)} note={`${summary.debts.active} attivi`} />
-              <KpiCard label="Entrate mese" value={formatEUR(summary.income)} note={`${summary.transactions} movimenti`} />
-              <KpiCard label="Uscite mese" value={formatEUR(summary.expenses)} note={`Saldo ${formatEUR(summary.balance)}`} />
-              <KpiCard label="Rate 30 giorni" value={String(summary.payments.upcoming.length)} note={summary.payments.overdue > 0 ? `${summary.payments.overdue} scadute` : "Nessuna scaduta"} />
+              <KpiCard label={t("dashboard.kpiDebt")} value={formatEUR(summary.debts.totalRemaining)} note={`${summary.debts.active} ${t("dashboard.kpiActive")}`} />
+              <KpiCard label={t("dashboard.kpiIncome")} value={formatEUR(summary.income)} note={`${summary.transactions} ${t("dashboard.kpiMovements")}`} />
+              <KpiCard label={t("dashboard.kpiExpenses")} value={formatEUR(summary.expenses)} note={`${t("dashboard.kpiBalance")} ${formatEUR(summary.balance)}`} />
+              <KpiCard
+                label={t("dashboard.kpiRates")}
+                value={String(summary.payments.upcoming.length)}
+                note={summary.payments.overdue > 0 ? `${summary.payments.overdue} ${t("dashboard.kpiOverdue")}` : t("dashboard.kpiNoOverdue")}
+              />
             </div>
 
             <AiAdvisor />
 
             <Card>
-              <SectionTitle kicker="Rientro" title="Piani di rientro" action={<Link to="/debts" className="font-label-md text-label-md text-primary">Vedi tutti</Link>} />
+              <SectionTitle kicker={t("dashboard.payoffKicker")} title={t("dashboard.payoffTitle")} action={<Link to="/debts" className="font-label-md text-label-md text-primary">{t("dashboard.seeAll")}</Link>} />
               {debts.length === 0 ? (
-                <p className="font-body-md text-body-md text-on-surface-variant">Nessun debito attivo. Ottimo stato.</p>
+                <p className="font-body-md text-body-md text-on-surface-variant">{t("dashboard.noDebts")}</p>
               ) : (
                 <div className="flex flex-col gap-space-md">
                   {debts.map((d) => (
                     <div key={d.id}>
                       <div className="flex items-baseline justify-between gap-space-sm">
                         <p className="font-headline-sm text-headline-sm text-on-surface truncate">{d.creditorName}</p>
-                        <p className="tnum font-body-md text-body-md text-on-surface-variant shrink-0">{paidPct(d)}% estinto</p>
+                        <p className="tnum font-body-md text-body-md text-on-surface-variant shrink-0">{paidPct(d)}% {t("dashboard.paidOff")}</p>
                       </div>
                       <p className="font-body-sm text-body-sm text-on-surface-variant">
-                        {d.debtType} · Residuo {formatEUR(d.remainingAmount)} di {formatEUR(d.totalAmount)}
+                        {d.debtType} · {t("debts.remaining")} {formatEUR(d.remainingAmount)} {t("debts.of")} {formatEUR(d.totalAmount)}
                       </p>
                       <div className="mt-space-xs">
                         <ProgressBar value={paidPct(d)} tone="teal" />
@@ -109,20 +115,20 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-space-lg">
               <SavingsGoals />
               <Card>
-                <SectionTitle kicker="Calendario" title="Prossime scadenze" />
+                <SectionTitle kicker={t("dashboard.calendarKicker")} title={t("dashboard.calendarTitle")} />
                 {summary.payments.upcoming.length === 0 ? (
-                  <p className="font-body-md text-body-md text-on-surface-variant">Nessuna scadenza nei prossimi 30 giorni.</p>
+                  <p className="font-body-md text-body-md text-on-surface-variant">{t("dashboard.noUpcoming")}</p>
                 ) : (
                   <ul className="flex flex-col divide-y divide-hairline">
                     {summary.payments.upcoming.map((p) => (
                       <li key={p.id} className="flex items-center gap-space-sm py-space-sm">
                         <div className="w-11 shrink-0 rounded-lg bg-surface-container px-1 py-1 text-center">
                           <p className="font-headline-sm text-headline-sm text-on-surface">{new Date(p.dueDate).getDate()}</p>
-                          <p className="font-label-xs text-label-xs uppercase text-on-surface-variant">{new Date(p.dueDate).toLocaleDateString("it-IT", { month: "short" })}</p>
+                          <p className="font-label-xs text-label-xs uppercase text-on-surface-variant">{new Date(p.dueDate).toLocaleDateString(undefined, { month: "short" })}</p>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-body-md text-body-md text-on-surface truncate">{p.debt.creditorName}</p>
-                          <p className="font-body-sm text-body-sm text-on-surface-variant">Rata · {formatShortDate(p.dueDate)}</p>
+                          <p className="font-body-sm text-body-sm text-on-surface-variant">{formatShortDate(p.dueDate)}</p>
                         </div>
                         <p className="tnum font-body-md text-body-md text-on-surface shrink-0">{formatEUR(p.amount)}</p>
                       </li>
@@ -130,25 +136,25 @@ export default function Dashboard() {
                   </ul>
                 )}
                 {summary.payments.overdue > 0 && (
-                  <div className="mt-space-sm"><Chip tone="amber">{summary.payments.overdue} rate scadute da pagare</Chip></div>
+                  <div className="mt-space-sm"><Chip tone="amber">{summary.payments.overdue} {t("dashboard.overdueToPay")}</Chip></div>
                 )}
               </Card>
             </div>
 
             <Card>
-              <SectionTitle kicker="Movimenti" title="Transazioni recenti" action={<Link to="/transactions" className="font-label-md text-label-md text-primary">Vedi tutte</Link>} />
+              <SectionTitle kicker={t("dashboard.movementsKicker")} title={t("dashboard.recentTitle")} action={<Link to="/transactions" className="font-label-md text-label-md text-primary">{t("dashboard.seeAllTransactions")}</Link>} />
               {recent.length === 0 ? (
-                <p className="font-body-md text-body-md text-on-surface-variant">Nessun movimento in questo periodo.</p>
+                <p className="font-body-md text-body-md text-on-surface-variant">{t("dashboard.noRecent")}</p>
               ) : (
                 <ul className="flex flex-col divide-y divide-hairline">
-                  {recent.map((t) => (
-                    <li key={t.id} className="flex items-center gap-space-sm py-space-sm">
+                  {recent.map((tr) => (
+                    <li key={tr.id} className="flex items-center gap-space-sm py-space-sm">
                       <div className="flex-1 min-w-0">
-                        <p className="font-body-md text-body-md text-on-surface truncate">{t.description ?? t.category?.name ?? "Movimento"}</p>
-                        <p className="font-body-sm text-body-sm text-on-surface-variant">{formatShortDate(t.transactionDate)} · {t.category?.name ?? "—"}</p>
+                        <p className="font-body-md text-body-md text-on-surface truncate">{tr.description ?? tr.category?.name ?? t("dashboard.movementFallback")}</p>
+                        <p className="font-body-sm text-body-sm text-on-surface-variant">{formatShortDate(tr.transactionDate)} · {tr.category?.name ?? "—"}</p>
                       </div>
-                      <p className={`tnum font-body-md text-body-md shrink-0 ${t.type === "INCOME" ? "text-tertiary" : "text-on-surface"}`}>
-                        {t.type === "INCOME" ? "+" : "−"}{formatEUR(t.amount)}
+                      <p className={`tnum font-body-md text-body-md shrink-0 ${tr.type === "INCOME" ? "text-tertiary" : "text-on-surface"}`}>
+                        {tr.type === "INCOME" ? "+" : "−"}{formatEUR(tr.amount)}
                       </p>
                     </li>
                   ))}

@@ -1,23 +1,23 @@
-// Formattazione valori per la UI: euro italiani e date corte.
+// Formattazione valori per la UI: euro e date nella lingua attiva.
 // Gli importi API arrivano come stringhe esatte ("45.50").
+import { currentLocale } from "../i18n/index.js";
 
-const eur = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
-
-// "45.50" -> "45,50 €". Accetta stringa o numero.
+// "45.50" -> "45,50 €" (it) / "€45.50" (en). Accetta stringa o numero.
 export function formatEUR(value) {
-  return eur.format(Number(value ?? 0));
+  return new Intl.NumberFormat(currentLocale(), { style: "currency", currency: "EUR" }).format(
+    Number(value ?? 0),
+  );
 }
 
-// Data ISO -> "15 mag" (scadenze) ; con anno se serve.
+// Data ISO -> "15 mag" (it) / "15 May" (en).
 export function formatShortDate(iso) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString(currentLocale(), { day: "numeric", month: "short" });
 }
 
-// "2026-10" -> "Ottobre 2026" per il selettore mese.
+// "2026-10" -> "Ottobre 2026" (it) / "October 2026" (en).
 export function formatMonthLabel(yyyyMm) {
   const [y, m] = yyyyMm.split("-").map(Number);
-  const label = new Date(y, m - 1, 1).toLocaleDateString("it-IT", { month: "long", year: "numeric" });
+  const label = new Date(y, m - 1, 1).toLocaleDateString(currentLocale(), { month: "long", year: "numeric" });
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
@@ -26,6 +26,15 @@ export function shiftMonth(yyyyMm, delta) {
   const [y, m] = yyyyMm.split("-").map(Number);
   const d = new Date(y, m - 1 + delta, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+// Data ISO -> giorno + mese corto nella lingua attiva.
+export function dueParts(iso) {
+  const d = new Date(iso);
+  return {
+    day: d.getDate(),
+    month: d.toLocaleDateString(currentLocale(), { month: "short" }),
+  };
 }
 
 // Mese corrente in formato YYYY-MM.

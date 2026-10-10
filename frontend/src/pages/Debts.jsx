@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import AppShell from "../components/AppShell.jsx";
 import { ErrorAlert, Field, PrimaryButton, Select, TextInput, TrashToggle } from "../components/forms.jsx";
 import { Card, Chip, ProgressBar, SectionTitle } from "../components/ui.jsx";
@@ -7,9 +8,10 @@ import { formatEUR, formatShortDate } from "../lib/format.js";
 
 // Piani di rientro: lista debiti con rate, pagamento rate,
 // nuovo debito, nuova rata, cestino con ripristino.
-const DEBT_TYPE_LABELS = { BNPL: "BNPL", CREDIT_CARD: "Carta", PERSONAL_LOAN: "Prestito", MORTGAGE: "Mutuo", OTHER: "Altro" };
+const TYPE_KEYS = { BNPL: "typeBNPL", CREDIT_CARD: "typeCard", PERSONAL_LOAN: "typeLoan", MORTGAGE: "typeMortgage", OTHER: "typeOther" };
 
 export default function Debts() {
+  const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -84,8 +86,6 @@ export default function Debts() {
       });
       setShowPayForm(false);
       setNewPay({ amount: "", dueDate: "" });
-      await reload();
-      // Rileggi il dettaglio aggiornato per mostrare la nuova rata.
       const fresh = await debtsApi.list({ limit: 50 });
       setItems(fresh.items);
     } catch (err) {
@@ -96,7 +96,7 @@ export default function Debts() {
   // Paga una rata: serve la categoria per la transazione generata.
   async function onPay(paymentId) {
     if (!payCat) {
-      setError({ message: "Scegli la categoria per registrare il pagamento." });
+      setError({ message: t("debts.needCategory") });
       return;
     }
     setError(null);
@@ -109,7 +109,7 @@ export default function Debts() {
   }
 
   async function onDelete(id) {
-    if (!window.confirm("Spostare debito e rate nel cestino? Potrai ripristinarli.")) return;
+    if (!window.confirm(t("debts.confirmDelete"))) return;
     setError(null);
     try {
       await debtsApi.remove(id);
@@ -138,7 +138,7 @@ export default function Debts() {
 
   return (
     <AppShell>
-      <SectionTitle kicker="Rientro" title="Debiti" action={<button type="button" onClick={() => setShowForm((v) => !v)} className="h-10 px-3.5 rounded-lg bg-primary font-label-md text-label-md text-on-primary">+ Nuovo</button>} />
+      <SectionTitle kicker={t("debts.kicker")} title={t("debts.title")} action={<button type="button" onClick={() => setShowForm((v) => !v)} className="h-10 px-3.5 rounded-lg bg-primary font-label-md text-label-md text-on-primary">{t("debts.new")}</button>} />
       <div className="mt-space-md">
         <TrashToggle showTrash={showTrash} onChange={(v) => { setShowTrash(v); setSelectedId(null); }} />
       </div>
@@ -149,67 +149,67 @@ export default function Debts() {
       {showForm && (
         <Card className="mt-space-md">
           <form onSubmit={onCreate} className="flex flex-col gap-space-sm">
-            <Field label="CREDITORE">
-              <TextInput required value={form.creditorName} onChange={(e) => set("creditorName", e.target.value)} placeholder="Es. Scalapay" />
+            <Field label={t("debts.creditor")}>
+              <TextInput required value={form.creditorName} onChange={(e) => set("creditorName", e.target.value)} placeholder={t("debts.creditorPh")} />
             </Field>
             <div className="grid grid-cols-2 gap-space-sm">
-              <Field label="TIPO">
+              <Field label={t("debts.type")}>
                 <Select value={form.debtType} onChange={(e) => set("debtType", e.target.value)}>
-                  {Object.entries(DEBT_TYPE_LABELS).map(([v, l]) => (
-                    <option key={v} value={v}>{l}</option>
+                  {Object.entries(TYPE_KEYS).map(([v, k]) => (
+                    <option key={v} value={v}>{t(`debts.${k}`)}</option>
                   ))}
                 </Select>
               </Field>
-              <Field label="INIZIO">
+              <Field label={t("debts.start")}>
                 <TextInput required type="date" value={form.startDate} onChange={(e) => set("startDate", e.target.value)} />
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-space-sm">
-              <Field label="TOTALE €">
+              <Field label={t("debts.total")}>
                 <TextInput required inputMode="decimal" placeholder="1200.00" value={form.totalAmount} onChange={(e) => set("totalAmount", e.target.value)} />
               </Field>
-              <Field label="RATA MENSILE €">
+              <Field label={t("debts.monthly")}>
                 <TextInput required inputMode="decimal" placeholder="100.00" value={form.monthlyPayment} onChange={(e) => set("monthlyPayment", e.target.value)} />
               </Field>
             </div>
-            <PrimaryButton busy={busy}>Salva debito</PrimaryButton>
+            <PrimaryButton busy={busy}>{t("debts.save")}</PrimaryButton>
           </form>
         </Card>
       )}
 
       <div className="flex flex-col gap-space-md mt-space-md">
         {items.length === 0 && (
-          <Card><p className="font-body-md text-body-md text-on-surface-variant">{showTrash ? "Cestino vuoto." : "Nessun debito. Puoi crearne uno col bottone + Nuovo."}</p></Card>
+          <Card><p className="font-body-md text-body-md text-on-surface-variant">{showTrash ? t("common.emptyTrash") : t("debts.noDebts")}</p></Card>
         )}
         {items.map((d) => (
           <Card key={d.id}>
             <div className="flex items-baseline justify-between gap-space-sm">
               <p className="font-headline-sm text-headline-sm text-on-surface truncate">{d.creditorName}</p>
-              {d.status === "PAID_OFF" ? <Chip tone="teal">Estinto</Chip> : d.status === "DEFAULTED" ? <Chip tone="amber">Sconfinato</Chip> : <Chip tone="indigo">{DEBT_TYPE_LABELS[d.debtType] ?? d.debtType}</Chip>}
+              {d.status === "PAID_OFF" ? <Chip tone="teal">{t("debts.paidOff")}</Chip> : d.status === "DEFAULTED" ? <Chip tone="amber">{t("debts.defaulted")}</Chip> : <Chip tone="indigo">{t(`debts.${TYPE_KEYS[d.debtType]}`)}</Chip>}
             </div>
             <p className="tnum font-body-md text-body-md text-on-surface mt-space-xs">
-              Residuo {formatEUR(d.remainingAmount)} di {formatEUR(d.totalAmount)} · {paidPct(d)}% estinto
+              {t("debts.remaining")} {formatEUR(d.remainingAmount)} {t("debts.of")} {formatEUR(d.totalAmount)} · {paidPct(d)}%
             </p>
             <div className="mt-space-xs"><ProgressBar value={paidPct(d)} tone="teal" /></div>
             <div className="flex flex-wrap gap-space-sm mt-space-sm">
               {!showTrash && (
                 <>
                   <button type="button" onClick={() => setSelectedId(selectedId === d.id ? null : d.id)} className="h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md">
-                    {selectedId === d.id ? "Chiudi rate" : `Rate (${d.payments?.length ?? 0})`}
+                    {selectedId === d.id ? t("debts.closeRates") : `${t("debts.rates")} (${d.payments?.length ?? 0})`}
                   </button>
-                  <button type="button" onClick={() => onDelete(d.id)} className="h-9 px-3 rounded-lg border border-error-container text-on-error-container font-label-md text-label-md">Cestina</button>
+                  <button type="button" onClick={() => onDelete(d.id)} className="h-9 px-3 rounded-lg border border-error-container text-on-error-container font-label-md text-label-md">{t("common.delete")}</button>
                 </>
               )}
               {showTrash && (
-                <button type="button" onClick={() => onRestore(d.id)} className="h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md">Ripristina</button>
+                <button type="button" onClick={() => onRestore(d.id)} className="h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md">{t("common.restore")}</button>
               )}
             </div>
 
             {selectedId === d.id && selected && !showTrash && (
               <div className="mt-space-md border-t border-hairline pt-space-sm">
-                <Field label="CATEGORIA PER I PAGAMENTI">
+                <Field label={t("debts.payCategory")}>
                   <Select value={payCat} onChange={(e) => setPayCat(e.target.value)}>
-                    <option value="">Scegli…</option>
+                    <option value="">{t("transactions.choose")}</option>
                     {categories.filter((c) => c.type === "EXPENSE").map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
@@ -221,33 +221,33 @@ export default function Debts() {
                       <div className="flex-1 min-w-0">
                         <p className="tnum font-body-md text-body-md text-on-surface">{formatEUR(p.amount)}</p>
                         <p className="font-body-sm text-body-sm text-on-surface-variant">
-                          Scade {formatShortDate(p.dueDate)}{p.paidDate ? ` · pagata ${formatShortDate(p.paidDate)}` : ""}
+                          {t("debts.dueOn")} {formatShortDate(p.dueDate)}{p.paidDate ? ` · ${t("debts.paidOn")} ${formatShortDate(p.paidDate)}` : ""}
                         </p>
                       </div>
                       {p.status === "PAID" ? (
-                        <Chip tone="teal">Pagata</Chip>
+                        <Chip tone="teal">{t("debts.paid")}</Chip>
                       ) : (
-                        <button type="button" onClick={() => onPay(p.id)} className="h-9 px-3 rounded-lg bg-primary font-label-md text-label-md text-on-primary shrink-0">Paga</button>
+                        <button type="button" onClick={() => onPay(p.id)} className="h-9 px-3 rounded-lg bg-primary font-label-md text-label-md text-on-primary shrink-0">{t("debts.pay")}</button>
                       )}
                     </li>
                   ))}
                   {(selected.payments ?? []).length === 0 && (
-                    <p className="font-body-md text-body-md text-on-surface-variant py-space-sm">Nessuna rata registrata.</p>
+                    <p className="font-body-md text-body-md text-on-surface-variant py-space-sm">{t("debts.noRates")}</p>
                   )}
                 </ul>
                 <button type="button" onClick={() => setShowPayForm((v) => !v)} className="mt-space-sm h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md">
-                  {showPayForm ? "Chiudi" : "+ Nuova rata"}
+                  {showPayForm ? t("debts.close") : t("debts.newRate")}
                 </button>
                 {showPayForm && (
                   <form onSubmit={onCreatePayment} className="grid grid-cols-2 gap-space-sm mt-space-sm">
-                    <Field label="IMPORTO €">
+                    <Field label={t("debts.rateAmount")}>
                       <TextInput required inputMode="decimal" placeholder="100.00" value={newPay.amount} onChange={(e) => setNewPay({ ...newPay, amount: e.target.value })} />
                     </Field>
-                    <Field label="SCADENZA">
+                    <Field label={t("debts.rateDue")}>
                       <TextInput required type="date" value={newPay.dueDate} onChange={(e) => setNewPay({ ...newPay, dueDate: e.target.value })} />
                     </Field>
                     <div className="col-span-2">
-                      <PrimaryButton busy={busy}>Aggiungi rata</PrimaryButton>
+                      <PrimaryButton busy={busy}>{t("debts.addRate")}</PrimaryButton>
                     </div>
                   </form>
                 )}

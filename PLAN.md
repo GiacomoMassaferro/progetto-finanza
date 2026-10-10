@@ -37,6 +37,7 @@
 | Rate limit | express-rate-limit | 8.7.1 | 300/15min global on `/api`, 30/15min on `/api/v1/auth`, JSON 429 |
 | Tests (dev) | vitest 5.0.3 + supertest 7.3.1 | `pnpm test` — integration vs real MySQL, throwaway `test-*` users, I-06 cleanup |
 | Frontend | React 19 + Vite 8 + react-router 7 + Tailwind 3.4 | JS only, mobile-first, theme tokens from Stitch DESIGN.md, JWT client with auto-refresh |
+| Frontend i18n | i18next + react-i18next | key-based `src/i18n/*.json` (en default + it/es/de, 142 keys), `pnpm i18n:check` parity script, Intl dates/numbers follow language |
 | ORM | Prisma | 7.10.0 | `prisma-client-js` generator, MySQL provider |
 | DB driver | @prisma/adapter-mariadb (mariadb connector) | 7.10.0 (3.4.5) | Prisma 7 requires a driver adapter |
 | DB | MySQL | 8.4.10 (local) | `utf8mb4_unicode_ci` |
@@ -90,6 +91,7 @@ backend/
 | `POST /api/v1/auth/login` | no | body `{ email, password }` → 200 `{ data: { user, tokens } }`, 401 generic on bad credentials |
 | `POST /api/v1/auth/refresh` | no | body `{ refreshToken }` → 200 new pair (single-use rotation), 401 on reuse/expiry |
 | `GET /api/v1/auth/me` | **yes (Bearer access)** | 200 `{ data: { user } }`, 401 without/invalid token |
+| `PATCH /api/v1/auth/me` | **yes (Bearer access)** | body `{ language: en\|it\|es\|de }` → 200 `{ data: { user } }`, saved to profile |
 | `GET /api/v1/categories` | **yes** | list own active categories, `?page&limit(max100)&type=`, 200 `{ data: [], meta: { page, limit, total, pages } }` |
 | `POST /api/v1/categories` | **yes** | body `{ name, type: INCOME\|EXPENSE, color? }` → 201 `{ data }` |
 | `GET /api/v1/categories/:id` | **yes** | 200 `{ data }`, 404 if foreign/deleted/malformed id |
@@ -139,6 +141,7 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-08 | `20261008113428_fix_schema_timestamps_indexes` | `created_at/updated_at` everywhere, `@@index` on FKs + `status` + `transaction_date`, `onDelete: Restrict` explicit, field renames (`remainingAmount`, `firstName`) |
 | 2026-10-08 | `20261008114349_add_soft_delete` | `deleted_at NULL` + index on all 5 tables |
 | 2026-10-08 | `20261008172500_add_refresh_tokens` | `refresh_tokens` table (hash unique, expiry + indexes) |
+| 2026-10-10 | `20261010080732_add_user_language` | `users.language` VARCHAR(2) default `en` |
 
 ### 3.3 Soft-delete policy (binding)
 
@@ -166,8 +169,22 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-08 | D-12 | debt restore revives installments too (mirror of remove, one tx) | trash/restore must be symmetric: deleting hides both, restoring revives both |
 | 2026-10-08 | D-13 | shared `src/common/utils/money.js` — cents for math, `"0.00"` strings for API | `String(Decimal("300.00"))` yields `"300"` (incident I-07); single helper guarantees exact uniform amounts everywhere |
 | 2026-10-09 | D-14 | frontend React+Vite+Tailwind3 (JS only, mobile-first), Stitch token names kept 1:1, `src/lib/api.js` with single-retry refresh | reusing Stitch class names makes porting markup direct; refresh-once-then-logout keeps sessions alive without loops |
+| 2026-10-10 | D-15 | i18n key-based (react-i18next, 4 JSON dicts) instead of per-language components | one component set, new language = new file; `i18n:check` enforces key parity; backend messages stay as-is for MVP |
+| 2026-10-10 | D-16 | profile `language` in DB as source of truth, browser language pre-login, no localStorage | cross-device sync needs server state; logged-out choice is session-only by design (predictable, no stale overrides) |
 
 ## 5. Changelog (newest first — every entry dated)
+
+
+- **2026-10-10** — Profile language: `users.language` + migration, `PATCH /auth/me`, frontend browser-default + login selector + DB sync (no localStorage); backend tests 16/16, E2E verified (en→de→me), build green.
+- **2026-10-10** — Frontend i18n (solution A):
+
+
+- **2026-10-10** — Frontend i18n (solution A): react-i18next, `src/i18n/` with en (default) + it/es/de (142 keys each, `pnpm i18n:check` parity green), all components on `t()`, language selector in header + drawer, Intl numbers/dates follow language; build green, servers verified.
+- **2026-10-10** — Root `package.json` with `pnpm start` launching backend :3000 + frontend :5173 together (`concurrently`); `install:all`, `build`, `test` shortcuts; verified live.
+
+
+- **2026-10-10** — Root `package.json` with `pnpm start` launching backend :3000 + frontend :5173 together (`concurrently`); `install:all`, `build`, `test` shortcuts; verified live.
+- **2026-10-10** — Drawer animation:
 
 
 - **2026-10-10** — Drawer animation: subtle slide-in (200ms) + backdrop fade, quick slide-out (150ms) via CSS keyframes; close on backdrop/×/Esc/route change.

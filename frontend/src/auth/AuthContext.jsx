@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { setLanguage } from "../i18n/index.js";
 import { authApi, tokenStore } from "../lib/api.js";
 
 // Stato globale di sessione: user, caricamento iniziale, login/register/logout.
@@ -11,7 +12,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   // All'avvio: se c'è un token salvato, ricarica il profilo (col refresh
-  // automatico se l'access è scaduto ma il refresh è valido).
+  // automatico se l'access è scaduto ma il refresh è valido) e applica
+  // la lingua salvata nel profilo (verità su ogni dispositivo).
   useEffect(() => {
     if (!tokenStore.getAccess()) {
       setLoading(false);
@@ -19,7 +21,12 @@ export function AuthProvider({ children }) {
     }
     authApi
       .me(tokenStore.getAccess())
-      .then(({ user: me }) => setUser(me))
+      .then(({ user: me }) => {
+        setUser(me);
+        if (me.language) {
+          setLanguage(me.language);
+        }
+      })
       .catch(() => tokenStore.clear())
       .finally(() => setLoading(false));
   }, []);
@@ -28,6 +35,9 @@ export function AuthProvider({ children }) {
     const { user: me, tokens } = await authApi.login(input);
     tokenStore.set(tokens);
     setUser(me);
+    if (me.language) {
+      await setLanguage(me.language);
+    }
     return me;
   }, []);
 
@@ -35,6 +45,9 @@ export function AuthProvider({ children }) {
     const { user: me, tokens } = await authApi.register(input);
     tokenStore.set(tokens);
     setUser(me);
+    if (me.language) {
+      await setLanguage(me.language);
+    }
     return me;
   }, []);
 

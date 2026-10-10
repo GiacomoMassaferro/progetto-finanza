@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 // Pezzi di form riusati dalle pagine operative (stesso stile del login).
 // Mobile-first: campi impilati a tutta larghezza.
 
@@ -30,6 +32,7 @@ export function Select({ children, ...props }) {
 
 // Bottone primario (salva, paga, crea) con stato di attesa.
 export function PrimaryButton({ busy, children, ...props }) {
+  const { t } = useTranslation();
   return (
     <button
       type="submit"
@@ -37,20 +40,21 @@ export function PrimaryButton({ busy, children, ...props }) {
       {...props}
       className="h-10 px-4 rounded-lg bg-primary font-label-md text-label-md text-on-primary disabled:opacity-50"
     >
-      {busy ? "Attendi…" : children}
+      {busy ? t("common.wait") : children}
     </button>
   );
 }
 
 // Messaggio di errore API: mostra message + dettagli zod se presenti.
 export function ErrorAlert({ error, onClose }) {
+  const { t } = useTranslation();
   if (!error) return null;
   return (
     <p role="alert" className="rounded-lg border border-error-container bg-error-container px-3 py-2 font-body-md text-body-md text-on-error-container">
       {error.details?.join(", ") ?? error.message ?? error}
       {onClose && (
         <button type="button" onClick={onClose} className="ml-2 underline">
-          Chiudi
+          {t("common.close")}
         </button>
       )}
     </p>
@@ -59,13 +63,14 @@ export function ErrorAlert({ error, onClose }) {
 
 // Interruttore lista/cestino usato da tutte le pagine operative.
 export function TrashToggle({ showTrash, onChange, count }) {
+  const { t } = useTranslation();
   return (
     <div className="flex rounded-lg bg-surface-container p-1 font-label-md text-label-md">
       <button type="button" onClick={() => onChange(false)} className={`flex-1 h-9 rounded-md ${!showTrash ? "bg-surface-container-lowest shadow-sm text-on-surface" : "text-on-surface-variant"}`}>
-        Attivi
+        {t("common.active")}
       </button>
       <button type="button" onClick={() => onChange(true)} className={`flex-1 h-9 rounded-md ${showTrash ? "bg-surface-container-lowest shadow-sm text-on-surface" : "text-on-surface-variant"}`}>
-        Cestino{typeof count === "number" ? ` (${count})` : ""}
+        {t("common.trash")}{typeof count === "number" ? ` (${count})` : ""}
       </button>
     </div>
   );

@@ -13,6 +13,8 @@ model User {
     passwordHash String   @map("password_hash")
     firstName    String?  @map("first_name")
     lastName     String?  @map("last_name")
+    // Lingua preferita (en|it|es|de): segue l'utente su ogni dispositivo.
+    language     String   @default("en") @db.VarChar(2)
     createdAt    DateTime @default(now()) @map("created_at")
     updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
     // Soft delete: NULL = attivo, valorizzato = cancellato (recuperabile).
