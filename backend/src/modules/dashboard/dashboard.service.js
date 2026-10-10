@@ -3,7 +3,8 @@ import { withAlive } from "../../common/utils/softDelete.js";
 import { prisma } from "../../config/prisma.js";
 
 // Riepilogo del mese per l'utente: entrate/uscite, saldo, spesa per
-// categoria, situazione debiti e rate in scadenza. Solo record attivi.
+// categoria, situazione debiti e rate in scadenza + liquidità totale
+// (entrate - uscite da sempre: "quanti soldi ho adesso"). Solo record attivi.
 export async function summary(userId, { month, from, to }) {
     const uid = BigInt(userId);
 
@@ -55,6 +56,23 @@ export async function summary(userId, { month, from, to }) {
         _sum: { remainingAmount: true, monthlyPayment: true },
     });
 
+    // Liquidità totale: entrate - uscite da sempre (una sola aggregazione).
+    const lifetime = await prisma.transaction.groupBy({
+        by: ["type"],
+        where: withAlive({ userId: uid }),
+        _sum: { amount: true },
+    });
+    let lifeIncomeCents = 0;
+    let lifeExpenseCents = 0;
+    for (const row of lifetime) {
+        const cents = toCents(row._sum.amount);
+        if (row.type === "INCOME") {
+            lifeIncomeCents += cents;
+        } else {
+            lifeExpenseCents += cents;
+        }
+    }
+
     // Rate: quante scadute (PENDING con dueDate passata) e prossime 10 entro 30 giorni.
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -90,6 +108,12 @@ export async function summary(userId, { month, from, to }) {
             active: debts._count,
             totalRemaining: moneyFromCents(toCents(debts._sum.remainingAmount)),
             totalMonthly: moneyFromCents(toCents(debts._sum.monthlyPayment)),
+        },
+        lifetime: {
+            income: moneyFromCents(lifeIncomeCents),
+            expenses: moneyFromCents(lifeExpenseCents),
+            // La cifra che conta: quanti soldi ho adesso.
+            available: moneyFromCents(lifeIncomeCents - lifeExpenseCents),
         },
         payments: {
             overdue,

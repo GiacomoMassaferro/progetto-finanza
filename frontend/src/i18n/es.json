@@ -177,5 +177,19 @@
     "accountKicker": "Cuenta",
     "accountTitle": "Cuenta",
     "language": "IDIOMA"
+  },
+  "cashflow": {
+    "kicker": "Flujos",
+    "title": "Reparto",
+    "income": "Ingresos",
+    "expenses": "Gastos",
+    "debts": "Deudas",
+    "savings": "Ahorros",
+    "total": "Total",
+    "empty": "Aún sin datos.",
+    "available": "Disponible",
+    "availableNow": "Liquidez actual",
+    "hint": "Cuotas = solo el mes, nunca el total. Disponible = liquidez menos resto.",
+    "monthly": "Cuotas mensuales"
   }
 }

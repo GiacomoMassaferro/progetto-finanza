@@ -177,5 +177,19 @@
     "accountKicker": "Konto",
     "accountTitle": "Konto",
     "language": "SPRACHE"
+  },
+  "cashflow": {
+    "kicker": "Flüsse",
+    "title": "Aufteilung",
+    "income": "Einnahmen",
+    "expenses": "Ausgaben",
+    "debts": "Schulden",
+    "savings": "Ersparnisse",
+    "total": "Gesamt",
+    "empty": "Noch keine Daten.",
+    "available": "Verfügbar",
+    "availableNow": "Aktuelle Liquidität",
+    "hint": "Raten = nur der Monat, nie die Gesamtschuld. Verfügbar = Liquidität minus Rest.",
+    "monthly": "Monatsraten"
   }
 }

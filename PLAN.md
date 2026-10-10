@@ -114,7 +114,7 @@ backend/
 | `POST /api/v1/debts/with-installments` | **yes** | body `{ creditorName, debtType, totalAmount, interestRate?, tan?, taeg?, startDate, installments 1-60, firstDueDate }` → one tx creates debt + N monthly installments (equal, last adjusts cents) → 201 `{ data }` with embedded payments |
 | `POST /api/v1/debts/:id/payments/:paymentId/pay` | **yes** | atomic: mark PAID + create linked EXPENSE transaction + scale remainder; auto `PAID_OFF` at zero → 200 `{ data: { payment, transaction, debt } }`, 409 if already paid |
 | `POST /api/v1/ai/suggest` | **yes** | body `{ intent=payoff, locale? }` → LangChain router → deterministic avalanche engine on live data → 200 `{ data: { summary, items, warnings, snapshot, savings, projectedDebtFree } }` |
-| `GET /api/v1/dashboard/summary` | **yes** | `?month=YYYY-MM` (default current): income/expenses/balance (exact strings), count, per-category totals with names, active debts (count + total remaining/monthly), overdue count + next 10 payments in 30 days → 200 `{ data }`, 400 on bad month |
+| `GET /api/v1/dashboard/summary` | **yes** | `?month=YYYY-MM` (default current): income/expenses/balance (exact strings), count, per-category totals with names, active debts (count + total remaining/monthly), overdue count + next 10 payments in 30 days, `lifetime: { income, expenses, available }` (all-time cash) → 200 `{ data }`, 400 on bad month |
 | `GET /api/v1/goals` | **yes** | list own active goals with `progressPct`, `?page&limit(max100)&status` → 200 `{ data: [], meta }` |
 | `POST /api/v1/goals` | **yes** | body `{ name, targetAmount, currentAmount?=0, status?=ACTIVE }` → 201 `{ data }` |
 | `GET /api/v1/goals/:id` | **yes** | 200 `{ data }`, 404 if foreign/deleted |
@@ -188,6 +188,26 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-10 | D-18 | explicit TAN/TAEG columns (legacy `interestRate` kept as fallback) + `SavingsGoal` model; snapshot gains `savingsTotalCents` | the engine needs the true rate for early-payoff math; savings total lets the future LLM judge advance payments without draining the account |
 
 ## 5. Changelog (newest first — every entry dated)
+
+
+- **2026-10-10** — CashPie gains month income slice (center stays current cash); build green.
+- **2026-10-10** — CashPie fixed: debts count as monthly installment (never full balance), added month expenses slice, available = cash minus rest; i18n ×4 (173); build green.
+
+
+- **2026-10-10** — CashPie fixed: debts count as monthly installment (never full balance), added month expenses slice, available = cash minus rest; i18n ×4 (173); build green.
+- **2026-10-10** — Defensive lifetime default in Dashboard (shows 0.00 instead of white screen on stale backends); debug session green (suite 39/39, build, i18n 172×4, DB clean, no TODOs, only legit console.logs).
+
+
+- **2026-10-10** — Defensive lifetime default in Dashboard (shows 0.00 instead of white screen on stale backends); debug session green (suite 39/39, build, i18n 172×4, DB clean, no TODOs, only legit console.logs).
+- **2026-10-10** — Dashboard cash-flow donut:
+
+
+- **2026-10-10** — CashPie answers "how much money do I have": `summary.lifetime { income, expenses, available }`, donut shows current cash center + available/savings/debts slices; i18n ×4 (172); suite 39/39, build green, live verified (Marco: 1461.25 available).
+- **2026-10-10** — Installment expense tool:
+
+
+- **2026-10-10** — Dashboard cash-flow donut: hand-rolled SVG (`CashPie`) with legend (income/expenses/debts/savings + totals + %), reactive to month and data; i18n ×4 (169); build green.
+- **2026-10-10** — Debts section renamed Rientro→Debiti (IT) + equivalents in en/es/de (nav, kickers); i18n parity green, build green.
 
 
 - **2026-10-10** — Debts section renamed Rientro→Debiti (IT) + equivalents in en/es/de (nav, kickers); i18n parity green, build green.

@@ -4,9 +4,10 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthContext.jsx";
 import AiAdvisor from "../components/AiAdvisor.jsx";
 import AppShell from "../components/AppShell.jsx";
+import CashPie from "../components/CashPie.jsx";
 import SavingsGoals from "../components/SavingsGoals.jsx";
 import { Card, Chip, KpiCard, ProgressBar, SectionTitle } from "../components/ui.jsx";
-import { dashboardApi, debtsApi, transactionsApi } from "../lib/api.js";
+import { dashboardApi, debtsApi, goalsApi, transactionsApi } from "../lib/api.js";
 import { currentMonth, formatEUR, formatMonthLabel, formatShortDate, shiftMonth } from "../lib/format.js";
 
 // Dashboard: UNA sola pagina responsive (mobile-first, md: = desktop).
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const [summary, setSummary] = useState(null);
   const [debts, setDebts] = useState([]);
   const [recent, setRecent] = useState([]);
+  const [savingsTotal, setSavingsTotal] = useState("0.00");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -27,12 +29,14 @@ export default function Dashboard() {
     let cancelled = false;
     setLoading(true);
     setError("");
-    Promise.all([dashboardApi.summary(month), debtsApi.list({ limit: 3 }), transactionsApi.list({ limit: 4 })])
-      .then(([s, d, tr]) => {
+    Promise.all([dashboardApi.summary(month), debtsApi.list({ limit: 3 }), transactionsApi.list({ limit: 4 }), goalsApi.list({ limit: 100 })])
+      .then(([s, d, tr, g]) => {
         if (cancelled) return;
         setSummary(s);
         setDebts(d.items);
         setRecent(tr.items.slice(0, 4));
+        // Totale accantonato: alimenta la torta e si aggiorna coi dati.
+        setSavingsTotal(g.items.reduce((sum, goal) => sum + Number(goal.currentAmount), 0).toFixed(2));
       })
       .catch((err) => !cancelled && setError(err.message))
       .finally(() => !cancelled && setLoading(false));
@@ -40,6 +44,10 @@ export default function Dashboard() {
       cancelled = true;
     };
   }, [month]);
+
+  // Liquidità con default a zero: se il backend è datato e non manda
+  // `lifetime`, la torta mostra 0.00 invece di schermata bianca.
+  const lifetime = summary?.lifetime ?? { income: "0.00", expenses: "0.00", available: "0.00" };
 
   // Percentuale estinta del debito: 1 - residuo/totale.
   function paidPct(debt) {
@@ -161,6 +169,14 @@ export default function Dashboard() {
                 </ul>
               )}
             </Card>
+
+            <CashPie
+              available={lifetime.available}
+              income={summary.income}
+              expenses={summary.expenses}
+              monthlyDebts={summary.debts.totalMonthly}
+              savings={savingsTotal}
+            />
           </div>
         )
       )}

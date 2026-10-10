@@ -177,5 +177,19 @@
     "accountKicker": "Account",
     "accountTitle": "Account",
     "language": "LANGUAGE"
+  },
+  "cashflow": {
+    "kicker": "Flows",
+    "title": "Breakdown",
+    "income": "Income",
+    "expenses": "Expenses",
+    "debts": "Debts",
+    "savings": "Savings",
+    "total": "Total",
+    "empty": "No data to show yet.",
+    "available": "Available",
+    "availableNow": "Current cash",
+    "hint": "Installments = this month only, never the full balance. Available = cash minus the rest.",
+    "monthly": "Monthly installments"
   }
 }

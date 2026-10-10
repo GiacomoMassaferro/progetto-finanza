@@ -177,5 +177,19 @@
     "accountKicker": "Conto",
     "accountTitle": "Account",
     "language": "LINGUA"
+  },
+  "cashflow": {
+    "kicker": "Flussi",
+    "title": "Ripartizione",
+    "income": "Entrate",
+    "expenses": "Uscite",
+    "debts": "Debiti",
+    "savings": "Risparmi",
+    "total": "Totale",
+    "empty": "Ancora nessun dato da mostrare.",
+    "available": "Disponibile",
+    "availableNow": "Liquidità attuale",
+    "hint": "Rate = solo la rata del mese, mai il residuo totale. Disponibile = liquidità meno resto.",
+    "monthly": "Rate mensili"
   }
 }
