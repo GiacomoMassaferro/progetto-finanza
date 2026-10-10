@@ -190,6 +190,14 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 ## 5. Changelog (newest first — every entry dated)
 
 
+- **2026-10-10** — Debts section renamed Rientro→Debiti (IT) + equivalents in en/es/de (nav, kickers); i18n parity green, build green.
+- **2026-10-10** — Custom confirm modal replaces `window.confirm` (themed `ConfirmDialog` with Esc/backdrop close, i18n title ×4) in Transactions/Debts/Categories/Savings; build green.
+
+
+- **2026-10-10** — Custom confirm modal replaces `window.confirm` (themed `ConfirmDialog` with Esc/backdrop close, i18n title ×4) in Transactions/Debts/Categories/Savings; build green.
+- **2026-10-10** — Savings CRUD:
+
+
 - **2026-10-10** — Savings CRUD: `src/modules/savings/` (list/get/create/patch/deposit with auto-REACHED, trash/restore, `progressPct`) + `Savings` page (deposit inline, trash) + dashboard wired to real goals + tab; i18n ×4 (160); suite 39/39, build green, live verified.
 - **2026-10-10** — Installment expense tool:
 

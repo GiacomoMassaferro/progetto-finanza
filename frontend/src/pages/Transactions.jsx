@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import AppShell from "../components/AppShell.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import { ErrorAlert, Field, PrimaryButton, Select, TextInput, TrashToggle } from "../components/forms.jsx";
 import { Card, SectionTitle } from "../components/ui.jsx";
 import { categoriesApi, transactionsApi } from "../lib/api.js";
@@ -20,6 +21,8 @@ export default function Transactions() {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ amount: "", type: "EXPENSE", description: "", transactionDate: today(), movementsCategoryId: "" });
+  // Id in attesa di conferma cancellazione (modale invece di window.confirm).
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   // Ricarica lista + categorie a ogni cambio filtro o vista.
   useEffect(() => {
@@ -72,9 +75,9 @@ export default function Transactions() {
     }
   }
 
-  // Cancella (soft) o ripristina, poi ricarica la vista corrente.
+  // Cancella (soft) dopo conferma modale, poi ricarica la vista corrente.
   async function onDelete(id) {
-    if (!window.confirm(t("common.confirmTrash"))) return;
+    setPendingDeleteId(null);
     setError(null);
     try {
       await transactionsApi.remove(id);
@@ -177,7 +180,7 @@ export default function Transactions() {
                 {showTrash ? (
                   <button type="button" onClick={() => onRestore(item.id)} className="h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md shrink-0">{t("common.restore")}</button>
                 ) : (
-                  <button type="button" onClick={() => onDelete(item.id)} className="h-9 px-3 rounded-lg border border-error-container text-on-error-container font-label-md text-label-md shrink-0">{t("common.delete")}</button>
+                  <button type="button" onClick={() => setPendingDeleteId(item.id)} className="h-9 px-3 rounded-lg border border-error-container text-on-error-container font-label-md text-label-md shrink-0">{t("common.delete")}</button>
                 )}
               </li>
             ))}
@@ -185,6 +188,12 @@ export default function Transactions() {
         )}
         {meta && <p className="mt-space-sm font-body-sm text-body-sm text-on-surface-variant">{t("common.total")} {meta.total}</p>}
       </Card>
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        message={t("common.confirmTrash")}
+        onConfirm={() => onDelete(pendingDeleteId)}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </AppShell>
   );
 }

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthContext.jsx";
 import AppShell from "../components/AppShell.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import { ErrorAlert, Field, PrimaryButton, Select, TextInput, TrashToggle } from "../components/forms.jsx";
 import LanguageSelector from "../components/LanguageSelector.jsx";
 import { Card, Chip, SectionTitle } from "../components/ui.jsx";
@@ -22,6 +23,8 @@ export default function Categories() {
   const [form, setForm] = useState({ name: "", type: "EXPENSE" });
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState("");
+  // Id in attesa di conferma cancellazione (modale invece di window.confirm).
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   // Ricarica la vista corrente (attivi o cestino).
   async function load(trash) {
@@ -70,7 +73,7 @@ export default function Categories() {
   }
 
   async function onDelete(id) {
-    if (!window.confirm(t("common.confirmTrash"))) return;
+    setPendingDeleteId(null);
     setError(null);
     try {
       await categoriesApi.remove(id);
@@ -155,7 +158,7 @@ export default function Categories() {
                 ) : (
                   <>
                     <button type="button" onClick={() => { setEditingId(c.id); setEditingName(c.name); }} className="h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md shrink-0">{t("categories.rename")}</button>
-                    <button type="button" onClick={() => onDelete(c.id)} className="h-9 px-3 rounded-lg border border-error-container text-on-error-container font-label-md text-label-md shrink-0">{t("common.delete")}</button>
+                    <button type="button" onClick={() => setPendingDeleteId(c.id)} className="h-9 px-3 rounded-lg border border-error-container text-on-error-container font-label-md text-label-md shrink-0">{t("common.delete")}</button>
                   </>
                 )}
               </li>
@@ -177,6 +180,12 @@ export default function Categories() {
           <button type="button" onClick={onLogout} className="h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md">{t("nav.logout")}</button>
         </div>
       </Card>
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        message={t("common.confirmTrash")}
+        onConfirm={() => onDelete(pendingDeleteId)}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </AppShell>
   );
 }

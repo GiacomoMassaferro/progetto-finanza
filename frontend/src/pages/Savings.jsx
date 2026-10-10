@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import AppShell from "../components/AppShell.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import { ErrorAlert, Field, PrimaryButton, TextInput, TrashToggle } from "../components/forms.jsx";
 import { Card, Chip, ProgressBar, SectionTitle } from "../components/ui.jsx";
 import { goalsApi } from "../lib/api.js";
@@ -18,6 +19,8 @@ export default function Savings() {
   const [form, setForm] = useState({ name: "", targetAmount: "" });
   const [depositId, setDepositId] = useState(null);
   const [depositAmount, setDepositAmount] = useState("");
+  // Id in attesa di conferma cancellazione (modale invece di window.confirm).
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   // Ricarica la vista corrente (attivi o cestino).
   async function load(trash) {
@@ -65,7 +68,7 @@ export default function Savings() {
   }
 
   async function onDelete(id) {
-    if (!window.confirm(t("common.confirmTrash"))) return;
+    setPendingDeleteId(null);
     setError(null);
     try {
       await goalsApi.remove(id);
@@ -128,7 +131,7 @@ export default function Savings() {
                 <button type="button" onClick={() => { setDepositId(depositId === g.id ? null : g.id); setDepositAmount(""); }} className="h-9 px-3 rounded-lg bg-primary font-label-md text-label-md text-on-primary">{t("savings.deposit")}</button>
               )}
               {!showTrash && (
-                <button type="button" onClick={() => onDelete(g.id)} className="h-9 px-3 rounded-lg border border-error-container text-on-error-container font-label-md text-label-md">{t("common.delete")}</button>
+                <button type="button" onClick={() => setPendingDeleteId(g.id)} className="h-9 px-3 rounded-lg border border-error-container text-on-error-container font-label-md text-label-md">{t("common.delete")}</button>
               )}
               {showTrash && (
                 <button type="button" onClick={() => onRestore(g.id)} className="h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md">{t("common.restore")}</button>
@@ -145,6 +148,12 @@ export default function Savings() {
           </Card>
         ))}
       </div>
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        message={t("common.confirmTrash")}
+        onConfirm={() => onDelete(pendingDeleteId)}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </AppShell>
   );
 }

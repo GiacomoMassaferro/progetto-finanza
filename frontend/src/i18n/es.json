@@ -25,7 +25,8 @@
     "emptyTrash": "La papelera está vacía.",
     "wait": "Espera…",
     "sessionActive": "Sesión activa",
-    "confirmTrash": "¿Mover a la papelera? Podrás restaurarlo."
+    "confirmTrash": "¿Mover a la papelera? Podrás restaurarlo.",
+    "confirmTitle": "¿Seguro?"
   },
   "auth": {
     "loginTitle": "Project Finance",

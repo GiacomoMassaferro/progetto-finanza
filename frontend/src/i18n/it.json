@@ -1,7 +1,7 @@
 {
   "nav": {
     "dashboard": "Dashboard",
-    "debts": "Rientro",
+    "debts": "Debiti",
     "transactions": "Transazioni",
     "categories": "Categorie",
     "openMenu": "Apri menù",
@@ -25,7 +25,8 @@
     "emptyTrash": "Cestino vuoto.",
     "wait": "Attendi…",
     "sessionActive": "Sessione attiva",
-    "confirmTrash": "Spostare nel cestino? Potrai ripristinarla."
+    "confirmTrash": "Spostare nel cestino? Potrai ripristinarla.",
+    "confirmTitle": "Sei sicuro?"
   },
   "auth": {
     "loginTitle": "Project Finance",
@@ -58,7 +59,7 @@
     "kpiRates": "Rate 30 giorni",
     "kpiNoOverdue": "Nessuna scaduta",
     "kpiOverdue": "scadute",
-    "payoffKicker": "Rientro",
+    "payoffKicker": "Debiti",
     "payoffTitle": "Piani di rientro",
     "seeAll": "Vedi tutti",
     "noDebts": "Nessun debito attivo. Ottimo stato.",
@@ -117,7 +118,7 @@
     "noResults": "Nessun movimento con questi filtri."
   },
   "debts": {
-    "kicker": "Rientro",
+    "kicker": "Debiti",
     "title": "Debiti",
     "new": "+ Nuovo",
     "creditor": "CREDITORE",

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import AppShell from "../components/AppShell.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import { ErrorAlert, Field, PrimaryButton, SegmentedTabs, Select, TextInput } from "../components/forms.jsx";
 import { Card, Chip, ProgressBar, SectionTitle } from "../components/ui.jsx";
 import { categoriesApi, debtsApi } from "../lib/api.js";
@@ -26,6 +27,8 @@ export default function Debts() {
   const [payCat, setPayCat] = useState("");
   const [showPayForm, setShowPayForm] = useState(false);
   const [newPay, setNewPay] = useState({ amount: "", dueDate: "" });
+  // Id in attesa di conferma cancellazione (modale invece di window.confirm).
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   // Ricarica debiti (+ categorie per il pagamento) a ogni cambio vista.
   // Estinti = filtro status PAID_OFF (restano nel DB, fuori dagli attivi).
@@ -141,7 +144,7 @@ export default function Debts() {
   }
 
   async function onDelete(id) {
-    if (!window.confirm(t("debts.confirmDelete"))) return;
+    setPendingDeleteId(null);
     setError(null);
     try {
       await debtsApi.remove(id);
@@ -279,7 +282,7 @@ export default function Debts() {
                   <button type="button" onClick={() => setSelectedId(selectedId === d.id ? null : d.id)} className="h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md">
                     {selectedId === d.id ? t("debts.closeRates") : `${t("debts.rates")} (${d.payments?.length ?? 0})`}
                   </button>
-                  <button type="button" onClick={() => onDelete(d.id)} className="h-9 px-3 rounded-lg border border-error-container text-on-error-container font-label-md text-label-md">{t("common.delete")}</button>
+                  <button type="button" onClick={() => setPendingDeleteId(d.id)} className="h-9 px-3 rounded-lg border border-error-container text-on-error-container font-label-md text-label-md">{t("common.delete")}</button>
                 </>
               )}
               {view === "trash" && (
@@ -344,6 +347,12 @@ export default function Debts() {
           </Card>
         ))}
       </div>
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        message={t("debts.confirmDelete")}
+        onConfirm={() => onDelete(pendingDeleteId)}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </AppShell>
   );
 }

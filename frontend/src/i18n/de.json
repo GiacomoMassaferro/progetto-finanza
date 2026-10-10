@@ -1,7 +1,7 @@
 {
   "nav": {
     "dashboard": "Dashboard",
-    "debts": "Tilgen",
+    "debts": "Schulden",
     "transactions": "Buchungen",
     "categories": "Kategorien",
     "openMenu": "Menü öffnen",
@@ -25,7 +25,8 @@
     "emptyTrash": "Papierkorb ist leer.",
     "wait": "Bitte warten…",
     "sessionActive": "Aktive Sitzung",
-    "confirmTrash": "In den Papierkorb verschieben? Kann wiederhergestellt werden."
+    "confirmTrash": "In den Papierkorb verschieben? Kann wiederhergestellt werden.",
+    "confirmTitle": "Sicher?"
   },
   "auth": {
     "loginTitle": "Project Finance",
@@ -58,7 +59,7 @@
     "kpiRates": "Raten 30 Tage",
     "kpiNoOverdue": "Nichts überfällig",
     "kpiOverdue": "überfällig",
-    "payoffKicker": "Tilgung",
+    "payoffKicker": "Schulden",
     "payoffTitle": "Tilgungspläne",
     "seeAll": "Alle ansehen",
     "noDebts": "Keine aktiven Schulden. Gute Lage.",
@@ -117,7 +118,7 @@
     "noResults": "Keine Buchungen mit diesen Filtern."
   },
   "debts": {
-    "kicker": "Tilgung",
+    "kicker": "Schulden",
     "title": "Schulden",
     "new": "+ Neu",
     "creditor": "GLÄUBIGER",

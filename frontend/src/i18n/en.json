@@ -1,7 +1,7 @@
 {
   "nav": {
     "dashboard": "Dashboard",
-    "debts": "Payoff",
+    "debts": "Debts",
     "transactions": "Transactions",
     "categories": "Categories",
     "openMenu": "Open menu",
@@ -25,7 +25,8 @@
     "emptyTrash": "Trash is empty.",
     "wait": "Wait…",
     "sessionActive": "Active session",
-    "confirmTrash": "Move to trash? You can restore it later."
+    "confirmTrash": "Move to trash? You can restore it later.",
+    "confirmTitle": "Are you sure?"
   },
   "auth": {
     "loginTitle": "Project Finance",
@@ -58,7 +59,7 @@
     "kpiRates": "30-day installments",
     "kpiNoOverdue": "None overdue",
     "kpiOverdue": "overdue",
-    "payoffKicker": "Payoff",
+    "payoffKicker": "Debts",
     "payoffTitle": "Payoff plans",
     "seeAll": "See all",
     "noDebts": "No active debts. Great shape.",
@@ -117,7 +118,7 @@
     "noResults": "No movements with these filters."
   },
   "debts": {
-    "kicker": "Payoff",
+    "kicker": "Debts",
     "title": "Debts",
     "new": "+ New",
     "creditor": "CREDITOR",
