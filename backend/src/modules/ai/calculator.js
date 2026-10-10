@@ -13,10 +13,12 @@
 const STRINGS = {
     it: {
         summary: (n, when, interest, savings) =>
-            `Piano valanga su ${n} debiti: estinzione stimata ${when}, interessi stimati ${interest}. Extra mensili ${savings} destinati al risparmio.`,
+            n === 1
+                ? `Piano valanga su 1 debito: estinzione stimata ${when}, interessi stimati ${interest}. Extra mensili ${savings} destinati al risparmio.`
+                : `Piano valanga su ${n} debiti: estinzione stimata ${when}, interessi stimati ${interest}. Extra mensili ${savings} destinati al risparmio.`,
         noDebts: "Nessun debito attivo: niente da estinguere.",
         itemDetail: (when) => `Estinto a ${when} con la strategia valanga`,
-        warnOverdue: (n) => `${n} rate scadute: pagale prima di tutto`,
+        warnOverdue: (n) => (n === 1 ? "1 rata scaduta: pagala prima di tutto" : `${n} rate scadute: pagale prima di tutto`),
         warnNegative: "Spendi più di quanto guadagni: il piano non regge",
         warnLiquidity: "La liquidità non copre le scadenze dei prossimi 30 giorni",
         warnDti: "Le rate superano il 36% delle entrate: soglia di rischio",
@@ -26,10 +28,12 @@ const STRINGS = {
     },
     en: {
         summary: (n, when, interest, savings) =>
-            `Avalanche plan on ${n} debts: payoff around ${when}, estimated interest ${interest}. Monthly surplus ${savings} goes to savings.`,
+            n === 1
+                ? `Avalanche plan on 1 debt: payoff around ${when}, estimated interest ${interest}. Monthly surplus ${savings} goes to savings.`
+                : `Avalanche plan on ${n} debts: payoff around ${when}, estimated interest ${interest}. Monthly surplus ${savings} goes to savings.`,
         noDebts: "No active debts: nothing to pay off.",
         itemDetail: (when) => `Paid off by ${when} with the avalanche strategy`,
-        warnOverdue: (n) => `${n} overdue installments: pay them first`,
+        warnOverdue: (n) => (n === 1 ? "1 overdue installment: pay it first" : `${n} overdue installments: pay them first`),
         warnNegative: "You spend more than you earn: the plan does not hold",
         warnLiquidity: "Cash does not cover the next 30 days of due dates",
         warnDti: "Installments exceed 36% of income: risk threshold",
@@ -39,10 +43,12 @@ const STRINGS = {
     },
     es: {
         summary: (n, when, interest, savings) =>
-            `Plan avalancha sobre ${n} deudas: liquidación estimada ${when}, intereses estimados ${interest}. Excedente mensual ${savings} al ahorro.`,
+            n === 1
+                ? `Plan avalancha sobre 1 deuda: liquidación estimada ${when}, intereses estimados ${interest}. Excedente mensual ${savings} al ahorro.`
+                : `Plan avalancha sobre ${n} deudas: liquidación estimada ${when}, intereses estimados ${interest}. Excedente mensual ${savings} al ahorro.`,
         noDebts: "Sin deudas activas: nada que liquidar.",
         itemDetail: (when) => `Liquidada en ${when} con la estrategia avalancha`,
-        warnOverdue: (n) => `${n} cuotas vencidas: págalas primero`,
+        warnOverdue: (n) => (n === 1 ? "1 cuota vencida: págala primero" : `${n} cuotas vencidas: págalas primero`),
         warnNegative: "Gastas más de lo que ganas: el plan no se sostiene",
         warnLiquidity: "La liquidez no cubre los vencimientos de 30 días",
         warnDti: "Las cuotas superan el 36% de los ingresos: umbral de riesgo",
@@ -52,10 +58,12 @@ const STRINGS = {
     },
     de: {
         summary: (n, when, interest, savings) =>
-            `Avalanche-Plan für ${n} Schulden: Tilgung ca. ${when}, geschätzte Zinsen ${interest}. Monatsüberschuss ${savings} geht ans Sparen.`,
+            n === 1
+                ? `Avalanche-Plan für 1 Schuld: Tilgung ca. ${when}, geschätzte Zinsen ${interest}. Monatsüberschuss ${savings} geht ans Sparen.`
+                : `Avalanche-Plan für ${n} Schulden: Tilgung ca. ${when}, geschätzte Zinsen ${interest}. Monatsüberschuss ${savings} geht ans Sparen.`,
         noDebts: "Keine aktiven Schulden: nichts zu tilgen.",
         itemDetail: (when) => `Getilgt bis ${when} mit der Avalanche-Strategie`,
-        warnOverdue: (n) => `${n} überfällige Raten: zuerst zahlen`,
+        warnOverdue: (n) => (n === 1 ? "1 überfällige Rate: zuerst zahlen" : `${n} überfällige Raten: zuerst zahlen`),
         warnNegative: "Du gibst mehr aus als du verdienst: Plan hält nicht",
         warnLiquidity: "Liquidität deckt die nächsten 30 Tage nicht",
         warnDti: "Raten über 36% des Einkommens: Risikoschwelle",

@@ -72,4 +72,24 @@ describe("buildPayoffPlan", () => {
         });
         expect(plan.summary).toContain("Avalanche-Plan");
     });
+
+    test("plurali corretti: 1 debito / 2 debiti, 1 rata / 2 rate", () => {
+        const one = buildPayoffPlan({
+            debts: [{ id: "1", creditorName: "X", remainingCents: 50000, annualRatePct: 5, monthlyCents: 5000 }],
+            snapshot: { ...SNAP, overdueCount: 1 },
+            locale: "it",
+        });
+        expect(one.summary).toContain("1 debito:");
+        expect(one.warnings.some((w) => w.includes("1 rata scaduta"))).toBe(true);
+        const two = buildPayoffPlan({
+            debts: [
+                { id: "1", creditorName: "X", remainingCents: 50000, annualRatePct: 5, monthlyCents: 5000 },
+                { id: "2", creditorName: "Y", remainingCents: 50000, annualRatePct: 5, monthlyCents: 5000 },
+            ],
+            snapshot: { ...SNAP, overdueCount: 2 },
+            locale: "it",
+        });
+        expect(two.summary).toContain("2 debiti:");
+        expect(two.warnings.some((w) => w.includes("2 rate scadute"))).toBe(true);
+    });
 });

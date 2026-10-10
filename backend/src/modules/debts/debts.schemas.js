@@ -89,6 +89,21 @@ const debtUpdateSchema = z
     })
     .refine((obj) => Object.keys(obj).length > 0, { message: "nessun campo da aggiornare" });
 
+// Body di POST /debts/with-installments: debito + N rate mensili uguali.
+// Le rate partono da firstDueDate a cadenza mensile; l'ultima conguaglia
+// i centesimi (es. 100/3 -> 33.33 + 33.33 + 33.34).
+const debtWithInstallmentsSchema = z.object({
+    creditorName: debtFields.creditorName,
+    debtType: debtFields.debtType,
+    totalAmount: moneyField("totalAmount"),
+    interestRate: moneyField("interestRate", { required: false, allowZero: true }),
+    tan: moneyField("tan", { required: false, allowZero: true }).nullable().optional(),
+    taeg: moneyField("taeg", { required: false, allowZero: true }).nullable().optional(),
+    startDate: dateField("startDate"),
+    installments: z.coerce.number().int().min(1).max(60),
+    firstDueDate: dateField("firstDueDate"),
+});
+
 // Body di POST /debts/:id/payments: importo e scadenza della rata.
 const paymentCreateSchema = z.object({
     amount: moneyField("amount"),
@@ -120,6 +135,10 @@ export function validateDebtList(query) {
 
 export function validateDebtCreate(body) {
     return parseOr400(debtCreateSchema, body, "Dati debito non validi");
+}
+
+export function validateDebtWithInstallments(body) {
+    return parseOr400(debtWithInstallmentsSchema, body, "Dati spesa a rate non validi");
 }
 
 export function validateDebtUpdate(body) {

@@ -28,15 +28,6 @@ export function shiftMonth(yyyyMm, delta) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-// Data ISO -> giorno + mese corto nella lingua attiva.
-export function dueParts(iso) {
-  const d = new Date(iso);
-  return {
-    day: d.getDate(),
-    month: d.toLocaleDateString(currentLocale(), { month: "short" }),
-  };
-}
-
 // Mese corrente in formato YYYY-MM.
 export function currentMonth() {
   const now = new Date();

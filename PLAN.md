@@ -111,6 +111,7 @@ backend/
 | `GET /api/v1/debts/:id/payments` | **yes** | installments of own debt → 200 `{ data: [] }` |
 | `POST /api/v1/debts/:id/payments` | **yes** | body `{ amount, dueDate }` → 201 `{ data }` |
 | `PATCH /api/v1/debts/:id/payments/:paymentId` | **yes** | partial (PAID without paidDate auto-sets today) → 200 `{ data }` |
+| `POST /api/v1/debts/with-installments` | **yes** | body `{ creditorName, debtType, totalAmount, interestRate?, tan?, taeg?, startDate, installments 1-60, firstDueDate }` → one tx creates debt + N monthly installments (equal, last adjusts cents) → 201 `{ data }` with embedded payments |
 | `POST /api/v1/debts/:id/payments/:paymentId/pay` | **yes** | atomic: mark PAID + create linked EXPENSE transaction + scale remainder; auto `PAID_OFF` at zero → 200 `{ data: { payment, transaction, debt } }`, 409 if already paid |
 | `POST /api/v1/ai/suggest` | **yes** | body `{ intent=payoff, locale? }` → LangChain router → deterministic avalanche engine on live data → 200 `{ data: { summary, items, warnings, snapshot, savings, projectedDebtFree } }` |
 | `GET /api/v1/dashboard/summary` | **yes** | `?month=YYYY-MM` (default current): income/expenses/balance (exact strings), count, per-category totals with names, active debts (count + total remaining/monthly), overdue count + next 10 payments in 30 days → 200 `{ data }`, 400 on bad month |
@@ -179,6 +180,18 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-10 | D-18 | explicit TAN/TAEG columns (legacy `interestRate` kept as fallback) + `SavingsGoal` model; snapshot gains `savingsTotalCents` | the engine needs the true rate for early-payoff math; savings total lets the future LLM judge advance payments without draining the account |
 
 ## 5. Changelog (newest first — every entry dated)
+
+
+- **2026-10-10** — Installment expense tool: `POST /debts/with-installments` (one tx: debt + N monthly installments, last adjusts cents) + Debts form with live rate estimate + i18n ×4 (151); 3 endpoint tests; live verified on :3001 (user server holds :3000 with older code — restart it to pick this up).
+- **2026-10-10** — Debts paid-off view:
+
+
+- **2026-10-10** — Debts paid-off view: Attivi/Estinti/Cestino tabs (`SegmentedTabs`, `?status=PAID_OFF` filter), read-only installments in paid-off view, i18n keys ×4 (145); build green, live verified on Marco data.
+- **2026-10-10** — Cleanup fix:
+
+
+- **2026-10-10** — Cleanup fix: plurals in payoff calculator (1 debito/N debiti, 1 rata/N rate in 4 locales + test), removed dead `dueParts()`, I-09 orphan-node rule; suite 33/33, build green.
+- **2026-10-10** — TAN/TAEG + savings goals:
 
 
 - **2026-10-10** — TAN/TAEG + savings goals: `debts.tan/taeg` nullable (effective rate taeg→tan→interestRate), `savings_goals` model + migration, debt API exposes both, AI snapshot gains `savingsTotalCents`; suite 32/32 green, DB clean.
@@ -264,6 +277,7 @@ pnpm test               # vitest suite (needs MySQL up; uses throwaway test-* us
 
 Startup order: MySQL (3306) → `pnpm dev` → check `/health` then `/ready`.
 Prereqs: Node 24, pnpm 11, MySQL 8.x with databases `express_finance` + empty `express_finance_shadow` and user `prisma_user`.
+Smoke-test hygiene: `Stop-Job` does NOT kill child `node` processes — kill them (`Get-Process node | Stop-Process -Force`) or use `Start-Process`/`Stop-Process -Id`, else stale code keeps serving :3000 (see I-09).
 
 ## 8. Troubleshooting (known incidents)
 
@@ -303,6 +317,11 @@ Prereqs: Node 24, pnpm 11, MySQL 8.x with databases `express_finance` + empty `e
 - **Symptoms:** all data pages (`/debts`, `/transactions`, `/categories`) blank; console points at `items.find`.
 - **Cause:** list endpoints answer `{ data: [], meta }` but frontend `api()` returned only `payload.data` (dropping `meta`), and pages read `.data` off that array → `undefined`.
 - **Fix:** new `apiPaged()` helper returning `{ items, meta }` in `src/lib/api.js`; pages adapted (`res.items`/`res.meta`); Dashboard simplified the same way. Rule: single-resource helpers return `data`, list helpers return `{ items, meta }`.
+
+### I-09 (2026-10-10) — stale node processes serve old code on :3000
+- **Symptoms:** smoke test returned 404 on `/ai/suggest` and 400 on valid PATCH tan/taeg while the automated suite was green.
+- **Cause:** `Stop-Job` kills the PowerShell job but orphaned `node` children survive and keep the port with stale code.
+- **Fix / rule:** after smoke tests kill node processes (`Get-Process node | Stop-Process -Force`), or launch the server with `Start-Process` + `Stop-Process -Id` (tracks the exact PID). Always re-run smoke after cleanup.
 
 ## 9. Backup & recovery
 

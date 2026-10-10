@@ -61,17 +61,38 @@ export function ErrorAlert({ error, onClose }) {
   );
 }
 
-// Interruttore lista/cestino usato da tutte le pagine operative.
+// Interruttore di vista a N voci (es. Attivi/Estinti/Cestino).
+// options: [{ value, label }]; value corrente; onChange(value).
+// TrashToggle resta come scorciatoia a due voci per le pagine semplici.
+export function SegmentedTabs({ options, value, onChange, count }) {
+  return (
+    <div className="flex rounded-lg bg-surface-container p-1 font-label-md text-label-md">
+      {options.map((tab) => (
+        <button
+          key={tab.value}
+          type="button"
+          onClick={() => onChange(tab.value)}
+          className={`flex-1 h-9 rounded-md px-2 ${value === tab.value ? "bg-surface-container-lowest shadow-sm text-on-surface" : "text-on-surface-variant"}`}
+        >
+          {tab.label}{tab.countable && typeof count === "number" ? ` (${count})` : ""}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Scorciatoia Attivi/Cestino per Transazioni e Categorie.
 export function TrashToggle({ showTrash, onChange, count }) {
   const { t } = useTranslation();
   return (
-    <div className="flex rounded-lg bg-surface-container p-1 font-label-md text-label-md">
-      <button type="button" onClick={() => onChange(false)} className={`flex-1 h-9 rounded-md ${!showTrash ? "bg-surface-container-lowest shadow-sm text-on-surface" : "text-on-surface-variant"}`}>
-        {t("common.active")}
-      </button>
-      <button type="button" onClick={() => onChange(true)} className={`flex-1 h-9 rounded-md ${showTrash ? "bg-surface-container-lowest shadow-sm text-on-surface" : "text-on-surface-variant"}`}>
-        {t("common.trash")}{typeof count === "number" ? ` (${count})` : ""}
-      </button>
-    </div>
+    <SegmentedTabs
+      value={showTrash ? "trash" : "active"}
+      onChange={(v) => onChange(v === "trash")}
+      count={count}
+      options={[
+        { value: "active", label: t("common.active") },
+        { value: "trash", label: t("common.trash"), countable: true },
+      ]}
+    />
   );
 }

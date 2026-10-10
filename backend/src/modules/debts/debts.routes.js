@@ -9,6 +9,8 @@ router.use(auth);
 
 router.get("/", debtsController.list);
 router.post("/", debtsController.create);
+// Rotta fissa prima di /:id: altrimenti "with-installments" verrebbe letto come id.
+router.post("/with-installments", debtsController.createWithInstallments);
 // Il cestino va prima di /:id: altrimenti "trash" verrebbe letto come id.
 router.get("/trash", debtsController.trash);
 router.post("/:id/restore", debtsController.restoreItem);

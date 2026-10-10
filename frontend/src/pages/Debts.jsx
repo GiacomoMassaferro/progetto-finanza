@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import AppShell from "../components/AppShell.jsx";
-import { ErrorAlert, Field, PrimaryButton, Select, TextInput, TrashToggle } from "../components/forms.jsx";
+import { ErrorAlert, Field, PrimaryButton, SegmentedTabs, Select, TextInput } from "../components/forms.jsx";
 import { Card, Chip, ProgressBar, SectionTitle } from "../components/ui.jsx";
 import { categoriesApi, debtsApi } from "../lib/api.js";
 import { formatEUR, formatShortDate } from "../lib/format.js";
@@ -15,20 +15,25 @@ export default function Debts() {
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [showTrash, setShowTrash] = useState(false);
+  // Vista corrente: attivi, estinti (PAID_OFF) o cestino.
+  const [view, setView] = useState("active");
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ creditorName: "", debtType: "BNPL", totalAmount: "", monthlyPayment: "", startDate: "" });
+  const [showInstForm, setShowInstForm] = useState(false);
+  const [instForm, setInstForm] = useState({ creditorName: "", debtType: "BNPL", totalAmount: "", installments: "3", firstDueDate: "" });
   const [payCat, setPayCat] = useState("");
   const [showPayForm, setShowPayForm] = useState(false);
   const [newPay, setNewPay] = useState({ amount: "", dueDate: "" });
 
   // Ricarica debiti (+ categorie per il pagamento) a ogni cambio vista.
+  // Estinti = filtro status PAID_OFF (restano nel DB, fuori dagli attivi).
   useEffect(() => {
     let cancelled = false;
-    const loader = showTrash ? debtsApi.trash : debtsApi.list;
-    loader({ limit: 50 })
+    const loader =
+      view === "trash" ? () => debtsApi.trash({ limit: 50 }) : () => debtsApi.list({ limit: 50, status: view === "paidoff" ? "PAID_OFF" : "ACTIVE" });
+    loader()
       .then((res) => !cancelled && setItems(res.items))
       .catch((err) => !cancelled && setError(err));
     categoriesApi
@@ -38,7 +43,7 @@ export default function Debts() {
     return () => {
       cancelled = true;
     };
-  }, [showTrash]);
+  }, [view]);
 
   const selected = items.find((d) => d.id === selectedId) ?? null;
 
@@ -48,8 +53,10 @@ export default function Debts() {
 
   // Ricarica la vista corrente dopo ogni operazione.
   async function reload() {
-    const loader = showTrash ? debtsApi.trash : debtsApi.list;
-    const res = await loader({ limit: 50 });
+    const res =
+      view === "trash"
+        ? await debtsApi.trash({ limit: 50 })
+        : await debtsApi.list({ limit: 50, status: view === "paidoff" ? "PAID_OFF" : "ACTIVE" });
     setItems(res.items);
   }
 
@@ -90,6 +97,31 @@ export default function Debts() {
       setItems(fresh.items);
     } catch (err) {
       setError(err);
+    }
+  }
+
+  // Crea debito + N rate mensili in un colpo solo (endpoint atomico).
+  async function onCreateInstallments(e) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      await debtsApi.createWithInstallments({
+        creditorName: instForm.creditorName.trim(),
+        debtType: instForm.debtType,
+        totalAmount: instForm.totalAmount.replace(",", "."),
+        startDate: instForm.firstDueDate,
+        installments: Number(instForm.installments),
+        firstDueDate: instForm.firstDueDate,
+      });
+      setShowInstForm(false);
+      setInstForm({ creditorName: "", debtType: "BNPL", totalAmount: "", installments: "3", firstDueDate: "" });
+      setView("active");
+      await reload();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -139,8 +171,21 @@ export default function Debts() {
   return (
     <AppShell>
       <SectionTitle kicker={t("debts.kicker")} title={t("debts.title")} action={<button type="button" onClick={() => setShowForm((v) => !v)} className="h-10 px-3.5 rounded-lg bg-primary font-label-md text-label-md text-on-primary">{t("debts.new")}</button>} />
+      <div className="mt-space-sm">
+        <button type="button" onClick={() => setShowInstForm((v) => !v)} className="h-10 w-full rounded-lg border border-primary text-primary font-label-md text-label-md">
+          {t("debts.newInstallments")}
+        </button>
+      </div>
       <div className="mt-space-md">
-        <TrashToggle showTrash={showTrash} onChange={(v) => { setShowTrash(v); setSelectedId(null); }} />
+        <SegmentedTabs
+          value={view}
+          onChange={(v) => { setView(v); setSelectedId(null); }}
+          options={[
+            { value: "active", label: t("common.active") },
+            { value: "paidoff", label: t("debts.paidOffTab") },
+            { value: "trash", label: t("common.trash") },
+          ]}
+        />
       </div>
       <div className="mt-space-sm">
         <ErrorAlert error={error} onClose={() => setError(null)} />
@@ -177,9 +222,46 @@ export default function Debts() {
         </Card>
       )}
 
+      {showInstForm && (
+        <Card className="mt-space-md">
+          <form onSubmit={onCreateInstallments} className="flex flex-col gap-space-sm">
+            <p className="font-body-sm text-body-sm text-on-surface-variant">{t("debts.installmentsHint")}</p>
+            <Field label={t("debts.creditor")}>
+              <TextInput required value={instForm.creditorName} onChange={(e) => setInstForm({ ...instForm, creditorName: e.target.value })} placeholder={t("debts.creditorPh")} />
+            </Field>
+            <div className="grid grid-cols-2 gap-space-sm">
+              <Field label={t("debts.total")}>
+                <TextInput required inputMode="decimal" placeholder="300.00" value={instForm.totalAmount} onChange={(e) => setInstForm({ ...instForm, totalAmount: e.target.value })} />
+              </Field>
+              <Field label={t("debts.installmentsCount")}>
+                <TextInput required type="number" min="1" max="60" value={instForm.installments} onChange={(e) => setInstForm({ ...instForm, installments: e.target.value })} />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-space-sm">
+              <Field label={t("debts.type")}>
+                <Select value={instForm.debtType} onChange={(e) => setInstForm({ ...instForm, debtType: e.target.value })}>
+                  {Object.entries(TYPE_KEYS).map(([v, k]) => (
+                    <option key={v} value={v}>{t(`debts.${k}`)}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label={t("debts.firstDue")}>
+                <TextInput required type="date" value={instForm.firstDueDate} onChange={(e) => setInstForm({ ...instForm, firstDueDate: e.target.value })} />
+              </Field>
+            </div>
+            {instForm.totalAmount && Number(instForm.installments) > 0 && (
+              <p className="font-body-md text-body-md text-on-surface-variant">
+                {t("debts.estimatedRate")}: {formatEUR(Number(instForm.totalAmount.replace(",", ".")) / Number(instForm.installments))}/mese × {instForm.installments}
+              </p>
+            )}
+            <PrimaryButton busy={busy}>{t("debts.createInstallments")}</PrimaryButton>
+          </form>
+        </Card>
+      )}
+
       <div className="flex flex-col gap-space-md mt-space-md">
         {items.length === 0 && (
-          <Card><p className="font-body-md text-body-md text-on-surface-variant">{showTrash ? t("common.emptyTrash") : t("debts.noDebts")}</p></Card>
+          <Card><p className="font-body-md text-body-md text-on-surface-variant">{view === "trash" ? t("common.emptyTrash") : view === "paidoff" ? t("debts.noPaidOff") : t("debts.noDebts")}</p></Card>
         )}
         {items.map((d) => (
           <Card key={d.id}>
@@ -192,7 +274,7 @@ export default function Debts() {
             </p>
             <div className="mt-space-xs"><ProgressBar value={paidPct(d)} tone="teal" /></div>
             <div className="flex flex-wrap gap-space-sm mt-space-sm">
-              {!showTrash && (
+              {view !== "trash" && (
                 <>
                   <button type="button" onClick={() => setSelectedId(selectedId === d.id ? null : d.id)} className="h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md">
                     {selectedId === d.id ? t("debts.closeRates") : `${t("debts.rates")} (${d.payments?.length ?? 0})`}
@@ -200,13 +282,14 @@ export default function Debts() {
                   <button type="button" onClick={() => onDelete(d.id)} className="h-9 px-3 rounded-lg border border-error-container text-on-error-container font-label-md text-label-md">{t("common.delete")}</button>
                 </>
               )}
-              {showTrash && (
+              {view === "trash" && (
                 <button type="button" onClick={() => onRestore(d.id)} className="h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md">{t("common.restore")}</button>
               )}
             </div>
 
-            {selectedId === d.id && selected && !showTrash && (
+            {selectedId === d.id && selected && view !== "trash" && (
               <div className="mt-space-md border-t border-hairline pt-space-sm">
+                {view === "active" && (
                 <Field label={t("debts.payCategory")}>
                   <Select value={payCat} onChange={(e) => setPayCat(e.target.value)}>
                     <option value="">{t("transactions.choose")}</option>
@@ -215,6 +298,7 @@ export default function Debts() {
                     ))}
                   </Select>
                 </Field>
+                )}
                 <ul className="flex flex-col divide-y divide-hairline mt-space-sm">
                   {(selected.payments ?? []).map((p) => (
                     <li key={p.id} className="flex items-center gap-space-sm py-space-sm">
@@ -224,8 +308,8 @@ export default function Debts() {
                           {t("debts.dueOn")} {formatShortDate(p.dueDate)}{p.paidDate ? ` · ${t("debts.paidOn")} ${formatShortDate(p.paidDate)}` : ""}
                         </p>
                       </div>
-                      {p.status === "PAID" ? (
-                        <Chip tone="teal">{t("debts.paid")}</Chip>
+                      {p.status === "PAID" || view !== "active" ? (
+                        <Chip tone={p.status === "PAID" ? "teal" : "indigo"}>{p.status === "PAID" ? t("debts.paid") : p.status}</Chip>
                       ) : (
                         <button type="button" onClick={() => onPay(p.id)} className="h-9 px-3 rounded-lg bg-primary font-label-md text-label-md text-on-primary shrink-0">{t("debts.pay")}</button>
                       )}
@@ -235,6 +319,8 @@ export default function Debts() {
                     <p className="font-body-md text-body-md text-on-surface-variant py-space-sm">{t("debts.noRates")}</p>
                   )}
                 </ul>
+                {view === "active" && (
+                <>
                 <button type="button" onClick={() => setShowPayForm((v) => !v)} className="mt-space-sm h-9 px-3 rounded-lg border border-outline-variant font-label-md text-label-md">
                   {showPayForm ? t("debts.close") : t("debts.newRate")}
                 </button>
@@ -250,6 +336,8 @@ export default function Debts() {
                       <PrimaryButton busy={busy}>{t("debts.addRate")}</PrimaryButton>
                     </div>
                   </form>
+                )}
+                </>
                 )}
               </div>
             )}

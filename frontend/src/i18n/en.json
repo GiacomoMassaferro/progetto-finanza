@@ -142,7 +142,15 @@
     "addRate": "Add installment",
     "noRates": "No installments recorded.",
     "needCategory": "Choose the category to record the payment.",
-    "confirmDelete": "Move debt and installments to trash? You can restore them."
+    "confirmDelete": "Move debt and installments to trash? You can restore them.",
+    "paidOffTab": "Paid off",
+    "noPaidOff": "No paid-off debts.",
+    "newInstallments": "+ Installment expense",
+    "installmentsHint": "One shot: creates the debt and equal monthly installments (last one adjusts cents).",
+    "installmentsCount": "INSTAL. COUNT",
+    "firstDue": "FIRST DUE",
+    "estimatedRate": "Estimated installment",
+    "createInstallments": "Create installment expense"
   },
   "categories": {
     "kicker": "Organize",

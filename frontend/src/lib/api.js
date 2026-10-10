@@ -129,6 +129,8 @@ export const transactionsApi = {
 export const debtsApi = {
   list: (params = {}) => apiPaged("/debts", params),
   create: (input) => api("/debts", { method: "POST", body: input }),
+  // Spesa a rate: crea debito + N rate mensili in un colpo solo (atomico).
+  createWithInstallments: (input) => api("/debts/with-installments", { method: "POST", body: input }),
   update: (id, input) => api(`/debts/${id}`, { method: "PATCH", body: input }),
   remove: (id) => api(`/debts/${id}`, { method: "DELETE" }),
   trash: (params = {}) => apiPaged("/debts/trash", params),

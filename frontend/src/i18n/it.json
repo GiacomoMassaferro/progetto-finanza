@@ -142,7 +142,15 @@
     "addRate": "Aggiungi rata",
     "noRates": "Nessuna rata registrata.",
     "needCategory": "Scegli la categoria per registrare il pagamento.",
-    "confirmDelete": "Spostare debito e rate nel cestino? Potrai ripristinarli."
+    "confirmDelete": "Spostare debito e rate nel cestino? Potrai ripristinarli.",
+    "paidOffTab": "Estinti",
+    "noPaidOff": "Nessun debito estinto.",
+    "newInstallments": "+ Spesa a rate",
+    "installmentsHint": "Un colpo solo: crea il debito e le rate mensili uguali (l’ultima conguaglia i centesimi).",
+    "installmentsCount": "N. RATE",
+    "firstDue": "PRIMA SCADENZA",
+    "estimatedRate": "Rata stimata",
+    "createInstallments": "Crea spesa a rate"
   },
   "categories": {
     "kicker": "Organizza",

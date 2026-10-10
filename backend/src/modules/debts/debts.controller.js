@@ -4,6 +4,7 @@ import {
     validateDebtCreate,
     validateDebtList,
     validateDebtUpdate,
+    validateDebtWithInstallments,
     validatePay,
     validatePaymentCreate,
     validatePaymentUpdate,
@@ -29,6 +30,13 @@ export const getById = asyncHandler(async (req, res) => {
 export const create = asyncHandler(async (req, res) => {
     const input = validateDebtCreate(req.body);
     const item = await debtsService.create(req.user.id, input);
+    res.status(201).json({ data: item });
+});
+
+// POST /api/v1/debts/with-installments -> 201 { data } (debito + N rate).
+export const createWithInstallments = asyncHandler(async (req, res) => {
+    const input = validateDebtWithInstallments(req.body);
+    const item = await debtsService.createWithInstallments(req.user.id, input);
     res.status(201).json({ data: item });
 });
 

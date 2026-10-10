@@ -142,7 +142,15 @@
     "addRate": "Añadir cuota",
     "noRates": "Sin cuotas registradas.",
     "needCategory": "Elige la categoría para registrar el pago.",
-    "confirmDelete": "¿Mover deuda y cuotas a la papelera? Podrás restaurarlas."
+    "confirmDelete": "¿Mover deuda y cuotas a la papelera? Podrás restaurarlas.",
+    "paidOffTab": "Liquidadas",
+    "noPaidOff": "Sin deudas liquidadas.",
+    "newInstallments": "+ Gasto en cuotas",
+    "installmentsHint": "De una vez: crea la deuda y cuotas mensuales iguales (la última ajusta céntimos).",
+    "installmentsCount": "N. CUOTAS",
+    "firstDue": "PRIMER VENCIMIENTO",
+    "estimatedRate": "Cuota estimada",
+    "createInstallments": "Crear gasto en cuotas"
   },
   "categories": {
     "kicker": "Organizar",

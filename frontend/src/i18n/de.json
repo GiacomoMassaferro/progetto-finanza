@@ -142,7 +142,15 @@
     "addRate": "Rate hinzufügen",
     "noRates": "Keine Raten erfasst.",
     "needCategory": "Kategorie zum Erfassen der Zahlung wählen.",
-    "confirmDelete": "Schuld und Raten in den Papierkorb? Kann wiederhergestellt werden."
+    "confirmDelete": "Schuld und Raten in den Papierkorb? Kann wiederhergestellt werden.",
+    "paidOffTab": "Getilgt",
+    "noPaidOff": "Keine getilgten Schulden.",
+    "newInstallments": "+ Ratenkauf",
+    "installmentsHint": "Auf einmal: erstellt Schuld und gleiche Monatsraten (letzte gleicht Cent aus).",
+    "installmentsCount": "RATENANZAHL",
+    "firstDue": "ERSTE FÄLLIGKEIT",
+    "estimatedRate": "Geschätzte Rate",
+    "createInstallments": "Ratenkauf erstellen"
   },
   "categories": {
     "kicker": "Ordnen",

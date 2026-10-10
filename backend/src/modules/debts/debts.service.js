@@ -137,6 +137,47 @@ export async function create(userId, data) {
     return toSafeDebt(row);
 }
 
+// Crea un debito con N rate mensili in un'unica transazione atomica.
+// Gli importi si dividono in centesimi: rate uguali, l'ultima conguaglia
+// il resto (100.00/3 -> 33.33 + 33.33 + 33.34). Le scadenze sono mensili
+// da firstDueDate (stesso giorno; a cavallo di mesi corti JS normalizza).
+export async function createWithInstallments(userId, data) {
+    const totalCents = Math.round(Number(data.totalAmount) * 100);
+    const base = Math.floor(totalCents / data.installments);
+    const amounts = Array.from({ length: data.installments }, (_, i) =>
+        i === data.installments - 1 ? totalCents - base * (data.installments - 1) : base,
+    );
+    const first = new Date(data.firstDueDate);
+    const dueDates = amounts.map((_, i) => new Date(first.getFullYear(), first.getMonth() + i, first.getDate()));
+
+    const debt = await prisma.$transaction(async (tx) => {
+        const created = await tx.debt.create({
+            data: {
+                userId: BigInt(userId),
+                creditorName: data.creditorName,
+                debtType: data.debtType,
+                totalAmount: data.totalAmount,
+                remainingAmount: data.totalAmount,
+                interestRate: data.interestRate ?? "0.00",
+                tan: data.tan ?? null,
+                taeg: data.taeg ?? null,
+                monthlyPayment: (base / 100).toFixed(2),
+                dueDayOfMonth: first.getDate(),
+                startDate: data.startDate,
+            },
+        });
+        await tx.debtPayment.createMany({
+            data: amounts.map((cents, i) => ({
+                debtId: created.id,
+                amount: (cents / 100).toFixed(2),
+                dueDate: dueDates[i],
+            })),
+        });
+        return created.id;
+    });
+    return getById(userId, String(debt));
+}
+
 // Modifica parziale, solo su debito proprio e attivo.
 export async function update(userId, id, data) {
     await findDebt(userId, id); // 404 se altrui o cancellato
