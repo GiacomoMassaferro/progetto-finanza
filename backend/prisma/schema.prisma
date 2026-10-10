@@ -26,6 +26,7 @@ model User {
     debts               Debt[]
     transactions        Transaction[]
     refreshTokens       RefreshToken[]
+    savingsGoals        SavingsGoal[]
 
     @@index([deletedAt])
     @@map("users")
@@ -80,6 +81,10 @@ model Debt {
     totalAmount     Decimal    @map("total_amount") @db.Decimal(10, 2)
     remainingAmount Decimal    @map("remaining_amount") @db.Decimal(10, 2)
     interestRate    Decimal    @default(0.00) @map("interest_rate") @db.Decimal(5, 2)
+    // TAN e TAEG espliciti (percentuali annue). Il calcolatore usa
+    // taeg ?? tan ?? interestRate (legacy, tenuto per compatibilità).
+    tan             Decimal?   @db.Decimal(5, 2)
+    taeg            Decimal?   @db.Decimal(5, 2)
     monthlyPayment  Decimal    @map("monthly_payment") @db.Decimal(10, 2)
     dueDayOfMonth   Int?       @map("due_day_of_month")
     startDate       DateTime   @map("start_date")
@@ -97,6 +102,29 @@ model Debt {
     @@index([status])
     @@index([deletedAt])
     @@map("debts")
+}
+
+// Obiettivi di risparmio (fondo emergenza, spese previste...).
+// Il motore IA li usa per i consigli; il surplus mensile ci finisce per regola.
+model SavingsGoal {
+    id            BigInt     @id @default(autoincrement())
+    userId        BigInt     @map("user_id")
+    name          String
+    targetAmount  Decimal    @map("target_amount") @db.Decimal(10, 2)
+    currentAmount Decimal    @default(0.00) @map("current_amount") @db.Decimal(10, 2)
+    status        GoalStatus @default(ACTIVE)
+    createdAt     DateTime   @default(now()) @map("created_at")
+    updatedAt     DateTime   @default(now()) @updatedAt @map("updated_at")
+    // Soft delete: NULL = attivo, valorizzato = cancellato (recuperabile).
+    deletedAt     DateTime?  @map("deleted_at")
+
+    // Relazioni
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([status])
+    @@index([deletedAt])
+    @@map("savings_goals")
 }
 
 // rate e piani di reintro
@@ -174,6 +202,12 @@ enum PaymentStatus {
     PENDING
     PAID
     LATE
+}
+
+enum GoalStatus {
+    ACTIVE
+    REACHED
+    ARCHIVED
 }
 
 enum TransactionType {

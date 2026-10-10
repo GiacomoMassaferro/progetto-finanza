@@ -36,6 +36,7 @@
 | Validation | zod | 4.6.5 | all `*.schemas.js` via shared `parseOr400` helper → uniform `AppError(400, details[])` |
 | Rate limit | express-rate-limit | 8.7.1 | 300/15min global on `/api`, 30/15min on `/api/v1/auth`, JSON 429 |
 | Tests (dev) | vitest 5.0.3 + supertest 7.3.1 | `pnpm test` — integration vs real MySQL, throwaway `test-*` users, I-06 cleanup |
+| AI | @langchain/core 1.2.17 | router + specialist runnables, zod-validated I/O; Gemini Flash wired in Phase 2 |
 | Frontend | React 19 + Vite 8 + react-router 7 + Tailwind 3.4 | JS only, mobile-first, theme tokens from Stitch DESIGN.md, JWT client with auto-refresh |
 | Frontend i18n | i18next + react-i18next | key-based `src/i18n/*.json` (en default + it/es/de, 142 keys), `pnpm i18n:check` parity script, Intl dates/numbers follow language |
 | ORM | Prisma | 7.10.0 | `prisma-client-js` generator, MySQL provider |
@@ -111,6 +112,7 @@ backend/
 | `POST /api/v1/debts/:id/payments` | **yes** | body `{ amount, dueDate }` → 201 `{ data }` |
 | `PATCH /api/v1/debts/:id/payments/:paymentId` | **yes** | partial (PAID without paidDate auto-sets today) → 200 `{ data }` |
 | `POST /api/v1/debts/:id/payments/:paymentId/pay` | **yes** | atomic: mark PAID + create linked EXPENSE transaction + scale remainder; auto `PAID_OFF` at zero → 200 `{ data: { payment, transaction, debt } }`, 409 if already paid |
+| `POST /api/v1/ai/suggest` | **yes** | body `{ intent=payoff, locale? }` → LangChain router → deterministic avalanche engine on live data → 200 `{ data: { summary, items, warnings, snapshot, savings, projectedDebtFree } }` |
 | `GET /api/v1/dashboard/summary` | **yes** | `?month=YYYY-MM` (default current): income/expenses/balance (exact strings), count, per-category totals with names, active debts (count + total remaining/monthly), overdue count + next 10 payments in 30 days → 200 `{ data }`, 400 on bad month |
 | `GET /api/v1/{categories,transactions}/trash` | **yes** | soft-deleted rows of the user, paginated → 200 `{ data: [], meta }` |
 | `POST /api/v1/{categories,transactions}/:id/restore` | **yes** | restore from trash → 200 `{ data }`, 404 if active/foreign |
@@ -124,9 +126,10 @@ Response conventions (binding for all future endpoints): success `{ data, meta? 
 
 ### 3.1 Models (`prisma/schema.prisma`)
 
-- `User` — email (unique), passwordHash, firstName?, lastName?
+- `User` — email (unique), passwordHash, firstName?, lastName?, language (default `en`)
 - `MovementsCategory` — per-user, `type: INCOME|EXPENSE`, color?
-- `Debt` — creditorName, `debtType: BNPL|CREDIT_CARD|PERSONAL_LOAN|MORTGAGE|OTHER`, totals, interestRate, monthlyPayment, dueDayOfMonth?, startDate, `status: ACTIVE|PAID_OFF|DEFAULTED`
+- `Debt` — creditorName, `debtType: BNPL|CREDIT_CARD|PERSONAL_LOAN|MORTGAGE|OTHER`, totals, interestRate (legacy), `tan?`/`taeg?` (effective rate: taeg ?? tan ?? interestRate), monthlyPayment, dueDayOfMonth?, startDate, `status: ACTIVE|PAID_OFF|DEFAULTED`
+- `SavingsGoal` — per-user, name, targetAmount, currentAmount (default 0), `status: ACTIVE|REACHED|ARCHIVED`
 - `DebtPayment` — installment: amount, dueDate, paidDate?, `status: PENDING|PAID|LATE`
 - `Transaction` — amount, `type: INCOME|EXPENSE`, description?, transactionDate, optional link to DebtPayment
 - `RefreshToken` — per-session row (`tokenHash` unique SHA-256, `expiresAt`); enables revocation + rotation. Ephemeral credential: expired/consumed rows are hard-deleted (exception to soft delete, see D-10)
@@ -142,6 +145,7 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-08 | `20261008114349_add_soft_delete` | `deleted_at NULL` + index on all 5 tables |
 | 2026-10-08 | `20261008172500_add_refresh_tokens` | `refresh_tokens` table (hash unique, expiry + indexes) |
 | 2026-10-10 | `20261010080732_add_user_language` | `users.language` VARCHAR(2) default `en` |
+| 2026-10-10 | `20261010095609_add_tan_taeg_savings_goals` | `debts.tan/taeg` nullable + `savings_goals` table (target/current, status, soft delete) |
 
 ### 3.3 Soft-delete policy (binding)
 
@@ -171,8 +175,22 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-09 | D-14 | frontend React+Vite+Tailwind3 (JS only, mobile-first), Stitch token names kept 1:1, `src/lib/api.js` with single-retry refresh | reusing Stitch class names makes porting markup direct; refresh-once-then-logout keeps sessions alive without loops |
 | 2026-10-10 | D-15 | i18n key-based (react-i18next, 4 JSON dicts) instead of per-language components | one component set, new language = new file; `i18n:check` enforces key parity; backend messages stay as-is for MVP |
 | 2026-10-10 | D-16 | profile `language` in DB as source of truth, browser language pre-login, no localStorage | cross-device sync needs server state; logged-out choice is session-only by design (predictable, no stale overrides) |
+| 2026-10-10 | D-17 | LangChain.js router with explicit intent + deterministic stub chains, zod I/O contract | numbers never from LLM (Phase 2 narrative only); same contract covers rules now and LLM later; no auto-apply without user confirm |
+| 2026-10-10 | D-18 | explicit TAN/TAEG columns (legacy `interestRate` kept as fallback) + `SavingsGoal` model; snapshot gains `savingsTotalCents` | the engine needs the true rate for early-payoff math; savings total lets the future LLM judge advance payments without draining the account |
 
 ## 5. Changelog (newest first — every entry dated)
+
+
+- **2026-10-10** — TAN/TAEG + savings goals: `debts.tan/taeg` nullable (effective rate taeg→tan→interestRate), `savings_goals` model + migration, debt API exposes both, AI snapshot gains `savingsTotalCents`; suite 32/32 green, DB clean.
+- **2026-10-10** — AI-1b:
+
+
+- **2026-10-10** — AI-1b: deterministic avalanche engine (`calculator.js`: rate-order payoff simulation, all surplus → savings fixed rule, aggregate-only LLM snapshot) + real payoff chain + `POST /ai/suggest`; contract extended (warnings/snapshot/savings); 9 new tests, suite 31/31 green; a wrong relative import broke 5 suites, fixed.
+- **2026-10-10** — AI-1a:
+
+
+- **2026-10-10** — AI-1a: `@langchain/core` + intent router (`payoff/savings/chat/unknown`) with deterministic stub chains and zod I/O contract (`src/modules/ai/`); 6 router tests, suite 22/22 green.
+- **2026-10-10** — Profile language:
 
 
 - **2026-10-10** — Profile language: `users.language` + migration, `PATCH /auth/me`, frontend browser-default + login selector + DB sync (no localStorage); backend tests 16/16, E2E verified (en→de→me), build green.
@@ -307,7 +325,7 @@ Prereqs: Node 24, pnpm 11, MySQL 8.x with databases `express_finance` + empty `e
 3. **Validation & support** — zod ✅ 2026-10-08, `trash`/`restore` ✅ 2026-10-08, `rate-limit` ✅ 2026-10-08, seed ✅ 2026-10-08.
 4. **Tooling** — vitest + supertest ✅ 2026-10-08 (14 tests, `pnpm test`); Docker/compose still open.
 5. **Frontend** — F1 ✅, F2 ✅, F3 ✅ 2026-10-10 (transactions/debts/categories pages wired; Stitch sources deleted).
-6. **AI layer** — payoff/saving suggestions (scope TBD after tracking works).
+6. **AI layer** — AI-1a ✅, AI-1b ✅ 2026-10-10 (rules engine + `POST /ai/suggest`) → Phase 2 Gemini Flash narrative (lazy provider, same contract).
 
 ## 12. Glossary
 

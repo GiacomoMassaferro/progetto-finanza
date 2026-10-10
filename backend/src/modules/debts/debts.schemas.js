@@ -61,6 +61,9 @@ const debtFields = {
     totalAmount: moneyField("totalAmount"),
     remainingAmount: moneyField("remainingAmount", { required: false }),
     interestRate: moneyField("interestRate", { required: false, allowZero: true }),
+    // TAN e TAEG espliciti (opzionali, >= 0, nullable per azzerarli).
+    tan: moneyField("tan", { required: false, allowZero: true }).nullable().optional(),
+    taeg: moneyField("taeg", { required: false, allowZero: true }).nullable().optional(),
     monthlyPayment: moneyField("monthlyPayment"),
     dueDayOfMonth: z.number().int().min(1).max(31).optional(),
     startDate: dateField("startDate"),
@@ -77,6 +80,8 @@ const debtUpdateSchema = z
         totalAmount: moneyField("totalAmount", { required: false }),
         remainingAmount: moneyField("remainingAmount", { required: false }),
         interestRate: moneyField("interestRate", { required: false, allowZero: true }),
+        tan: moneyField("tan", { required: false, allowZero: true }).nullable().optional(),
+        taeg: moneyField("taeg", { required: false, allowZero: true }).nullable().optional(),
         monthlyPayment: moneyField("monthlyPayment", { required: false }),
         dueDayOfMonth: dueDaySchema,
         startDate: dateField("startDate", { required: false }),
