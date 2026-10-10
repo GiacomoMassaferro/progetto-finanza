@@ -145,6 +145,17 @@ export const dashboardApi = {
   summary: (month) => api(`/dashboard/summary${month ? `?month=${month}` : ""}`),
 };
 
+export const goalsApi = {
+  list: (params = {}) => apiPaged("/goals", params),
+  create: (input) => api("/goals", { method: "POST", body: input }),
+  update: (id, input) => api(`/goals/${id}`, { method: "PATCH", body: input }),
+  remove: (id) => api(`/goals/${id}`, { method: "DELETE" }),
+  trash: (params = {}) => apiPaged("/goals/trash", params),
+  restore: (id) => api(`/goals/${id}/restore`, { method: "POST" }),
+  // Versa una somma: si somma all'accantonato (auto-REACHED al target).
+  deposit: (id, amount) => api(`/goals/${id}/deposit`, { method: "POST", body: { amount } }),
+};
+
 // Costruisce ?a=1&b=2 saltando i valori vuoti.
 function toQuery(params) {
   const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== "");

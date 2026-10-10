@@ -7,7 +7,8 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "logout": "Log out",
-    "brandSubtitle": "Algorithmic solvency"
+    "brandSubtitle": "Algorithmic solvency",
+    "savings": "Savings"
   },
   "common": {
     "loading": "Loading…",
@@ -83,9 +84,17 @@
   "savings": {
     "kicker": "Saving",
     "title": "Goals & reserves",
-    "staticBadge": "Static preview",
-    "goal1": "Emergency fund",
-    "goal2": "Planned expenses fund"
+    "new": "+ New",
+    "name": "NAME",
+    "namePh": "E.g. Emergency fund",
+    "target": "TARGET €",
+    "create": "Create goal",
+    "noGoals": "No goals. Create one with + New.",
+    "deposit": "Deposit",
+    "depositAmount": "Deposit amount",
+    "confirmDeposit": "Deposit",
+    "reached": "Reached",
+    "archived": "Archived"
   },
   "transactions": {
     "kicker": "Movements",

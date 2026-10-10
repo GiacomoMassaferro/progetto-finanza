@@ -7,7 +7,8 @@
     "openMenu": "Menü öffnen",
     "closeMenu": "Menü schließen",
     "logout": "Abmelden",
-    "brandSubtitle": "Algorithmische Solvenz"
+    "brandSubtitle": "Algorithmische Solvenz",
+    "savings": "Sparen"
   },
   "common": {
     "loading": "Wird geladen…",
@@ -83,9 +84,17 @@
   "savings": {
     "kicker": "Sparen",
     "title": "Ziele & Reserven",
-    "staticBadge": "Statische Vorschau",
-    "goal1": "Notfallfonds",
-    "goal2": "Fonds für geplante Ausgaben"
+    "new": "+ Neu",
+    "name": "NAME",
+    "namePh": "Z. B. Notfallfonds",
+    "target": "ZIEL €",
+    "create": "Ziel erstellen",
+    "noGoals": "Keine Ziele. Mit + Neu erstellen.",
+    "deposit": "Einzahlen",
+    "depositAmount": "Einzahlungsbetrag",
+    "confirmDeposit": "Einzahlen",
+    "reached": "Erreicht",
+    "archived": "Archiviert"
   },
   "transactions": {
     "kicker": "Buchungen",

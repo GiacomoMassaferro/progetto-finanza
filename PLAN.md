@@ -115,6 +115,14 @@ backend/
 | `POST /api/v1/debts/:id/payments/:paymentId/pay` | **yes** | atomic: mark PAID + create linked EXPENSE transaction + scale remainder; auto `PAID_OFF` at zero → 200 `{ data: { payment, transaction, debt } }`, 409 if already paid |
 | `POST /api/v1/ai/suggest` | **yes** | body `{ intent=payoff, locale? }` → LangChain router → deterministic avalanche engine on live data → 200 `{ data: { summary, items, warnings, snapshot, savings, projectedDebtFree } }` |
 | `GET /api/v1/dashboard/summary` | **yes** | `?month=YYYY-MM` (default current): income/expenses/balance (exact strings), count, per-category totals with names, active debts (count + total remaining/monthly), overdue count + next 10 payments in 30 days → 200 `{ data }`, 400 on bad month |
+| `GET /api/v1/goals` | **yes** | list own active goals with `progressPct`, `?page&limit(max100)&status` → 200 `{ data: [], meta }` |
+| `POST /api/v1/goals` | **yes** | body `{ name, targetAmount, currentAmount?=0, status?=ACTIVE }` → 201 `{ data }` |
+| `GET /api/v1/goals/:id` | **yes** | 200 `{ data }`, 404 if foreign/deleted |
+| `PATCH /api/v1/goals/:id` | **yes** | partial update → 200 `{ data }` |
+| `POST /api/v1/goals/:id/deposit` | **yes** | body `{ amount>0 }` adds up, auto `REACHED` at target → 200 `{ data }` |
+| `DELETE /api/v1/goals/:id` | **yes** | soft delete → 200 `{ data: { id, deletedAt } }` |
+| `GET /api/v1/goals/trash` | **yes** | soft-deleted goals → 200 `{ data: [], meta }` |
+| `POST /api/v1/goals/:id/restore` | **yes** | restore from trash → 200 `{ data }` |
 | `GET /api/v1/{categories,transactions}/trash` | **yes** | soft-deleted rows of the user, paginated → 200 `{ data: [], meta }` |
 | `POST /api/v1/{categories,transactions}/:id/restore` | **yes** | restore from trash → 200 `{ data }`, 404 if active/foreign |
 | `GET /api/v1/debts/trash` | **yes** | soft-deleted debts with their deleted installments → 200 `{ data: [], meta }` |
@@ -180,6 +188,10 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-10 | D-18 | explicit TAN/TAEG columns (legacy `interestRate` kept as fallback) + `SavingsGoal` model; snapshot gains `savingsTotalCents` | the engine needs the true rate for early-payoff math; savings total lets the future LLM judge advance payments without draining the account |
 
 ## 5. Changelog (newest first — every entry dated)
+
+
+- **2026-10-10** — Savings CRUD: `src/modules/savings/` (list/get/create/patch/deposit with auto-REACHED, trash/restore, `progressPct`) + `Savings` page (deposit inline, trash) + dashboard wired to real goals + tab; i18n ×4 (160); suite 39/39, build green, live verified.
+- **2026-10-10** — Installment expense tool:
 
 
 - **2026-10-10** — Installment expense tool: `POST /debts/with-installments` (one tx: debt + N monthly installments, last adjusts cents) + Debts form with live rate estimate + i18n ×4 (151); 3 endpoint tests; live verified on :3001 (user server holds :3000 with older code — restart it to pick this up).

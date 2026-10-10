@@ -7,7 +7,8 @@
     "openMenu": "Abrir menú",
     "closeMenu": "Cerrar menú",
     "logout": "Salir",
-    "brandSubtitle": "Solvencia algorítmica"
+    "brandSubtitle": "Solvencia algorítmica",
+    "savings": "Ahorro"
   },
   "common": {
     "loading": "Cargando…",
@@ -83,9 +84,17 @@
   "savings": {
     "kicker": "Ahorro",
     "title": "Metas y reservas",
-    "staticBadge": "Vista estática",
-    "goal1": "Fondo de emergencia",
-    "goal2": "Fondo de gastos previstos"
+    "new": "+ Nueva",
+    "name": "NOMBRE",
+    "namePh": "Ej. Fondo de emergencia",
+    "target": "META €",
+    "create": "Crear meta",
+    "noGoals": "Sin metas. Crea una con + Nueva.",
+    "deposit": "Aportar",
+    "depositAmount": "Importe del aporte",
+    "confirmDeposit": "Aportar",
+    "reached": "Lograda",
+    "archived": "Archivada"
   },
   "transactions": {
     "kicker": "Movimientos",

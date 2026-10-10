@@ -5,6 +5,7 @@ import authRoutes from "../modules/auth/auth.routes.js";
 import categoriesRoutes from "../modules/categories/categories.routes.js";
 import dashboardRoutes from "../modules/dashboard/dashboard.routes.js";
 import debtsRoutes from "../modules/debts/debts.routes.js";
+import savingsRoutes from "../modules/savings/savings.routes.js";
 import transactionsRoutes from "../modules/transactions/transactions.routes.js";
 
 const router = Router();
@@ -22,5 +23,6 @@ router.use("/categories", categoriesRoutes);
 router.use("/transactions", transactionsRoutes);
 router.use("/debts", debtsRoutes);
 router.use("/dashboard", dashboardRoutes);
+router.use("/goals", savingsRoutes);
 
 export default router;

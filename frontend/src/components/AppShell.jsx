@@ -11,6 +11,7 @@ const TABS = [
   { to: "/", key: "dashboard" },
   { to: "/debts", key: "debts" },
   { to: "/transactions", key: "transactions" },
+  { to: "/savings", key: "savings" },
   { to: "/categories", key: "categories" },
 ];
 

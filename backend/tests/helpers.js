@@ -44,6 +44,7 @@ export async function cleanupUser(email) {
     await prisma.transaction.deleteMany({ where: { userId: user.id } });
     await prisma.debtPayment.deleteMany({ where: { debt: { userId: user.id } } });
     await prisma.debt.deleteMany({ where: { userId: user.id } });
+    await prisma.savingsGoal.deleteMany({ where: { userId: user.id } });
     await prisma.movementsCategory.deleteMany({ where: { userId: user.id } });
     await prisma.user.delete({ where: { id: user.id } });
 }

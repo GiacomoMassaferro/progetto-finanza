@@ -7,7 +7,8 @@
     "openMenu": "Apri menù",
     "closeMenu": "Chiudi menù",
     "logout": "Esci",
-    "brandSubtitle": "Solvenza algoritmica"
+    "brandSubtitle": "Solvenza algoritmica",
+    "savings": "Risparmi"
   },
   "common": {
     "loading": "Caricamento…",
@@ -83,9 +84,17 @@
   "savings": {
     "kicker": "Risparmio",
     "title": "Obiettivi e riserve",
-    "staticBadge": "Anteprima statica",
-    "goal1": "Fondo Emergenza",
-    "goal2": "Fondo Spese Previste"
+    "new": "+ Nuovo",
+    "name": "NOME",
+    "namePh": "Es. Fondo Emergenza",
+    "target": "OBIETTIVO €",
+    "create": "Crea obiettivo",
+    "noGoals": "Nessun obiettivo. Creane uno col bottone + Nuovo.",
+    "deposit": "Versa",
+    "depositAmount": "Importo versamento",
+    "confirmDeposit": "Versa",
+    "reached": "Raggiunto",
+    "archived": "Archiviato"
   },
   "transactions": {
     "kicker": "Movimenti",
