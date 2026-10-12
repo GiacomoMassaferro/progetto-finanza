@@ -160,7 +160,20 @@
     "installmentsCount": "N. RATE",
     "firstDue": "PRIMA SCADENZA",
     "estimatedRate": "Rata stimata",
-    "createInstallments": "Crea spesa a rate"
+    "createInstallments": "Crea spesa a rate",
+    "inputMode": "COME LO INSERISCO?",
+    "modeSplit": "Totale + N rate",
+    "modePaid": "Rata + pagate/rimanenti",
+    "modeAmortized": "Finanziato + tasso + durata",
+    "financedAmount": "IMPORTO FINANZIATO €",
+    "annualRate": "TASSO ANNUO %",
+    "durationMonths": "DURATA (MESI)",
+    "paidCount": "RATE PAGATE",
+    "remainingCount": "RATE RIMANENTI",
+    "paidSummary": "Versato {{paid}}, restano {{left}}",
+    "historyCategory": "CATEGORIA STORICO PAGATE (FACOLTATIVA)",
+    "historyCategoryNone": "Senza movimenti storici",
+    "modeBare": "Senza piano rate"
   },
   "categories": {
     "kicker": "Organizza",

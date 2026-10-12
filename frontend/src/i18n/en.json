@@ -160,7 +160,20 @@
     "installmentsCount": "INSTAL. COUNT",
     "firstDue": "FIRST DUE",
     "estimatedRate": "Estimated installment",
-    "createInstallments": "Create installment expense"
+    "createInstallments": "Create installment expense",
+    "inputMode": "HOW TO ENTER?",
+    "modeSplit": "Total + N installments",
+    "modePaid": "Installment + paid/left",
+    "modeAmortized": "Financed + rate + term",
+    "financedAmount": "FINANCED AMOUNT €",
+    "annualRate": "ANNUAL RATE %",
+    "durationMonths": "TERM (MONTHS)",
+    "paidCount": "PAID COUNT",
+    "remainingCount": "LEFT COUNT",
+    "paidSummary": "Paid {{paid}}, left {{left}}",
+    "historyCategory": "PAID HISTORY CATEGORY (OPTIONAL)",
+    "historyCategoryNone": "No historic movements",
+    "modeBare": "No schedule"
   },
   "categories": {
     "kicker": "Organize",

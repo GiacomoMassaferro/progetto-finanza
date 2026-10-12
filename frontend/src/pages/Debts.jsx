@@ -18,12 +18,13 @@ export default function Debts() {
   const [selectedId, setSelectedId] = useState(null);
   // Vista corrente: attivi, estinti (PAID_OFF) o cestino.
   const [view, setView] = useState("active");
-  const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ creditorName: "", debtType: "BNPL", totalAmount: "", monthlyPayment: "", startDate: "" });
   const [showInstForm, setShowInstForm] = useState(false);
-  const [instForm, setInstForm] = useState({ creditorName: "", debtType: "BNPL", totalAmount: "", installments: "3", firstDueDate: "" });
+  // Form unico adattivo: 4 modalità (split/paid/amortized/bare).
+  // bare = debito senza piano rate (ex "+ Nuovo": solo totale + rata mensile).
+  const [instMode, setInstMode] = useState("split");
+  const [instForm, setInstForm] = useState({ creditorName: "", debtType: "BNPL", totalAmount: "", monthlyPayment: "", installments: "3", firstDueDate: "", installmentAmount: "", paidCount: "", remainingCount: "", financedAmount: "", annualRatePct: "", durationMonths: "", historyCategoryId: "" });
   const [payCat, setPayCat] = useState("");
   const [showPayForm, setShowPayForm] = useState(false);
   const [newPay, setNewPay] = useState({ amount: "", dueDate: "" });
@@ -50,10 +51,6 @@ export default function Debts() {
 
   const selected = items.find((d) => d.id === selectedId) ?? null;
 
-  function set(field, value) {
-    setForm((f) => ({ ...f, [field]: value }));
-  }
-
   // Ricarica la vista corrente dopo ogni operazione.
   async function reload() {
     const res =
@@ -61,28 +58,6 @@ export default function Debts() {
         ? await debtsApi.trash({ limit: 50 })
         : await debtsApi.list({ limit: 50, status: view === "paidoff" ? "PAID_OFF" : "ACTIVE" });
     setItems(res.items);
-  }
-
-  async function onCreate(e) {
-    e.preventDefault();
-    setError(null);
-    setBusy(true);
-    try {
-      await debtsApi.create({
-        creditorName: form.creditorName.trim(),
-        debtType: form.debtType,
-        totalAmount: form.totalAmount.replace(",", "."),
-        monthlyPayment: form.monthlyPayment.replace(",", "."),
-        startDate: form.startDate,
-      });
-      setShowForm(false);
-      setForm({ creditorName: "", debtType: "BNPL", totalAmount: "", monthlyPayment: "", startDate: "" });
-      await reload();
-    } catch (err) {
-      setError(err);
-    } finally {
-      setBusy(false);
-    }
   }
 
   // Crea una rata per il debito selezionato.
@@ -103,22 +78,66 @@ export default function Debts() {
     }
   }
 
-  // Crea debito + N rate mensili in un colpo solo (endpoint atomico).
+  // Svuota il form unificato dopo ogni creazione.
+  function resetInstForm() {
+    setInstForm({ creditorName: "", debtType: "BNPL", totalAmount: "", monthlyPayment: "", installments: "3", firstDueDate: "", installmentAmount: "", paidCount: "", remainingCount: "", financedAmount: "", annualRatePct: "", durationMonths: "", historyCategoryId: "" });
+  }
+
+  // Crea debito con o senza piano rate (endpoint dedicati).
+  // bare = debito libero senza scadenze (ex "+ Nuovo", POST /debts).
   async function onCreateInstallments(e) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      await debtsApi.createWithInstallments({
+      if (instMode === "bare") {
+        await debtsApi.create({
+          creditorName: instForm.creditorName.trim(),
+          debtType: instForm.debtType,
+          totalAmount: instForm.totalAmount.replace(",", "."),
+          monthlyPayment: instForm.monthlyPayment.replace(",", "."),
+          startDate: instForm.firstDueDate,
+        });
+        setShowInstForm(false);
+        resetInstForm();
+        setView("active");
+        await reload();
+        return;
+      }
+      const base = {
+        mode: instMode,
         creditorName: instForm.creditorName.trim(),
         debtType: instForm.debtType,
-        totalAmount: instForm.totalAmount.replace(",", "."),
         startDate: instForm.firstDueDate,
-        installments: Number(instForm.installments),
         firstDueDate: instForm.firstDueDate,
-      });
+      };
+      const dot = (v) => v.replace(",", ".");
+      const body =
+        instMode === "paid"
+          ? {
+              ...base,
+              installmentAmount: dot(instForm.installmentAmount),
+              paidCount: Number(instForm.paidCount),
+              remainingCount: Number(instForm.remainingCount),
+              // Categoria per lo storico: genera le transazioni delle rate
+              // già pagate (facoltativo, altrimenti restano senza movimento).
+              ...(instForm.historyCategoryId ? { movementsCategoryId: instForm.historyCategoryId } : {}),
+            }
+          : instMode === "amortized"
+            ? {
+                ...base,
+                financedAmount: dot(instForm.financedAmount),
+                ...(instForm.annualRatePct ? { annualRatePct: dot(instForm.annualRatePct) } : {}),
+                durationMonths: Number(instForm.durationMonths),
+              }
+            : {
+                ...base,
+                totalAmount: dot(instForm.totalAmount),
+                installments: Number(instForm.installments),
+              };
+      await debtsApi.createWithInstallments(body);
       setShowInstForm(false);
-      setInstForm({ creditorName: "", debtType: "BNPL", totalAmount: "", installments: "3", firstDueDate: "" });
+      resetInstForm();
       setView("active");
       await reload();
     } catch (err) {
@@ -173,9 +192,9 @@ export default function Debts() {
 
   return (
     <AppShell>
-      <SectionTitle kicker={t("debts.kicker")} title={t("debts.title")} action={<button type="button" onClick={() => setShowForm((v) => !v)} className="h-10 px-3.5 rounded-lg bg-primary font-label-md text-label-md text-on-primary">{t("debts.new")}</button>} />
+      <SectionTitle kicker={t("debts.kicker")} title={t("debts.title")} />
       <div className="mt-space-sm">
-        <button type="button" onClick={() => setShowInstForm((v) => !v)} className="h-10 w-full rounded-lg border border-primary text-primary font-label-md text-label-md">
+        <button type="button" onClick={() => setShowInstForm((v) => !v)} className="h-10 w-full rounded-lg bg-primary font-label-md text-label-md text-on-primary">
           {t("debts.newInstallments")}
         </button>
       </div>
@@ -194,52 +213,21 @@ export default function Debts() {
         <ErrorAlert error={error} onClose={() => setError(null)} />
       </div>
 
-      {showForm && (
-        <Card className="mt-space-md">
-          <form onSubmit={onCreate} className="flex flex-col gap-space-sm">
-            <Field label={t("debts.creditor")}>
-              <TextInput required value={form.creditorName} onChange={(e) => set("creditorName", e.target.value)} placeholder={t("debts.creditorPh")} />
-            </Field>
-            <div className="grid grid-cols-2 gap-space-sm">
-              <Field label={t("debts.type")}>
-                <Select value={form.debtType} onChange={(e) => set("debtType", e.target.value)}>
-                  {Object.entries(TYPE_KEYS).map(([v, k]) => (
-                    <option key={v} value={v}>{t(`debts.${k}`)}</option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label={t("debts.start")}>
-                <TextInput required type="date" value={form.startDate} onChange={(e) => set("startDate", e.target.value)} />
-              </Field>
-            </div>
-            <div className="grid grid-cols-2 gap-space-sm">
-              <Field label={t("debts.total")}>
-                <TextInput required inputMode="decimal" placeholder="1200.00" value={form.totalAmount} onChange={(e) => set("totalAmount", e.target.value)} />
-              </Field>
-              <Field label={t("debts.monthly")}>
-                <TextInput required inputMode="decimal" placeholder="100.00" value={form.monthlyPayment} onChange={(e) => set("monthlyPayment", e.target.value)} />
-              </Field>
-            </div>
-            <PrimaryButton busy={busy}>{t("debts.save")}</PrimaryButton>
-          </form>
-        </Card>
-      )}
-
       {showInstForm && (
         <Card className="mt-space-md">
           <form onSubmit={onCreateInstallments} className="flex flex-col gap-space-sm">
             <p className="font-body-sm text-body-sm text-on-surface-variant">{t("debts.installmentsHint")}</p>
+            <Field label={t("debts.inputMode")}>
+              <Select value={instMode} onChange={(e) => setInstMode(e.target.value)}>
+                <option value="split">{t("debts.modeSplit")}</option>
+                <option value="paid">{t("debts.modePaid")}</option>
+                <option value="amortized">{t("debts.modeAmortized")}</option>
+                <option value="bare">{t("debts.modeBare")}</option>
+              </Select>
+            </Field>
             <Field label={t("debts.creditor")}>
               <TextInput required value={instForm.creditorName} onChange={(e) => setInstForm({ ...instForm, creditorName: e.target.value })} placeholder={t("debts.creditorPh")} />
             </Field>
-            <div className="grid grid-cols-2 gap-space-sm">
-              <Field label={t("debts.total")}>
-                <TextInput required inputMode="decimal" placeholder="300.00" value={instForm.totalAmount} onChange={(e) => setInstForm({ ...instForm, totalAmount: e.target.value })} />
-              </Field>
-              <Field label={t("debts.installmentsCount")}>
-                <TextInput required type="number" min="1" max="60" value={instForm.installments} onChange={(e) => setInstForm({ ...instForm, installments: e.target.value })} />
-              </Field>
-            </div>
             <div className="grid grid-cols-2 gap-space-sm">
               <Field label={t("debts.type")}>
                 <Select value={instForm.debtType} onChange={(e) => setInstForm({ ...instForm, debtType: e.target.value })}>
@@ -248,16 +236,88 @@ export default function Debts() {
                   ))}
                 </Select>
               </Field>
-              <Field label={t("debts.firstDue")}>
-                <TextInput required type="date" value={instForm.firstDueDate} onChange={(e) => setInstForm({ ...instForm, firstDueDate: e.target.value })} />
-              </Field>
+              {instMode === "bare" ? (
+                <Field label={t("debts.start")}>
+                  <TextInput required type="date" value={instForm.firstDueDate} onChange={(e) => setInstForm({ ...instForm, firstDueDate: e.target.value })} />
+                </Field>
+              ) : (
+                <Field label={t("debts.firstDue")}>
+                  <TextInput required type="date" value={instForm.firstDueDate} onChange={(e) => setInstForm({ ...instForm, firstDueDate: e.target.value })} />
+                </Field>
+              )}
             </div>
-            {instForm.totalAmount && Number(instForm.installments) > 0 && (
+            {instMode === "bare" && (
+              <div className="grid grid-cols-2 gap-space-sm">
+                <Field label={t("debts.total")}>
+                  <TextInput required inputMode="decimal" placeholder="1200.00" value={instForm.totalAmount} onChange={(e) => setInstForm({ ...instForm, totalAmount: e.target.value })} />
+                </Field>
+                <Field label={t("debts.monthly")}>
+                  <TextInput required inputMode="decimal" placeholder="100.00" value={instForm.monthlyPayment} onChange={(e) => setInstForm({ ...instForm, monthlyPayment: e.target.value })} />
+                </Field>
+              </div>
+            )}
+            {instMode === "split" && (
+              <div className="grid grid-cols-2 gap-space-sm">
+                <Field label={t("debts.total")}>
+                  <TextInput required inputMode="decimal" placeholder="300.00" value={instForm.totalAmount} onChange={(e) => setInstForm({ ...instForm, totalAmount: e.target.value })} />
+                </Field>
+                <Field label={t("debts.installmentsCount")}>
+                  <TextInput required type="number" min="1" max="60" value={instForm.installments} onChange={(e) => setInstForm({ ...instForm, installments: e.target.value })} />
+                </Field>
+              </div>
+            )}
+            {instMode === "paid" && (
+              <>
+                <div className="grid grid-cols-3 gap-space-sm">
+                  <Field label={t("debts.rateAmount")}>
+                    <TextInput required inputMode="decimal" placeholder="304.00" value={instForm.installmentAmount} onChange={(e) => setInstForm({ ...instForm, installmentAmount: e.target.value })} />
+                  </Field>
+                  <Field label={t("debts.paidCount")}>
+                    <TextInput required type="number" min="0" max="59" value={instForm.paidCount} onChange={(e) => setInstForm({ ...instForm, paidCount: e.target.value })} />
+                  </Field>
+                  <Field label={t("debts.remainingCount")}>
+                    <TextInput required type="number" min="1" max="60" value={instForm.remainingCount} onChange={(e) => setInstForm({ ...instForm, remainingCount: e.target.value })} />
+                  </Field>
+                </div>
+                {instForm.installmentAmount && instForm.paidCount !== "" && instForm.remainingCount !== "" && (
+                  <p className="font-body-md text-body-md text-on-surface-variant">
+                    {t("debts.paidSummary", {
+                      paid: formatEUR(Number(instForm.installmentAmount.replace(",", ".")) * Number(instForm.paidCount || 0)),
+                      left: formatEUR(Number(instForm.installmentAmount.replace(",", ".")) * Number(instForm.remainingCount || 0)),
+                    })}
+                  </p>
+                )}
+                <Field label={t("debts.historyCategory")}>
+                  <Select value={instForm.historyCategoryId} onChange={(e) => setInstForm({ ...instForm, historyCategoryId: e.target.value })}>
+                    <option value="">{t("debts.historyCategoryNone")}</option>
+                    {categories.filter((c) => c.type === "EXPENSE").map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </Select>
+                </Field>
+              </>
+            )}
+            {instMode === "amortized" && (
+              <div className="grid grid-cols-2 gap-space-sm">
+                <Field label={t("debts.financedAmount")}>
+                  <TextInput required inputMode="decimal" placeholder="10000.00" value={instForm.financedAmount} onChange={(e) => setInstForm({ ...instForm, financedAmount: e.target.value })} />
+                </Field>
+                <Field label={t("debts.annualRate")}>
+                  <TextInput inputMode="decimal" placeholder="6.00" value={instForm.annualRatePct} onChange={(e) => setInstForm({ ...instForm, annualRatePct: e.target.value })} />
+                </Field>
+              </div>
+            )}
+            {instMode === "amortized" && (
+              <Field label={t("debts.durationMonths")}>
+                <TextInput required type="number" min="1" max="360" value={instForm.durationMonths} onChange={(e) => setInstForm({ ...instForm, durationMonths: e.target.value })} />
+              </Field>
+            )}
+            {instMode === "split" && instForm.totalAmount && Number(instForm.installments) > 0 && (
               <p className="font-body-md text-body-md text-on-surface-variant">
                 {t("debts.estimatedRate")}: {formatEUR(Number(instForm.totalAmount.replace(",", ".")) / Number(instForm.installments))}/mese × {instForm.installments}
               </p>
             )}
-            <PrimaryButton busy={busy}>{t("debts.createInstallments")}</PrimaryButton>
+            <PrimaryButton busy={busy}>{instMode === "bare" ? t("debts.save") : t("debts.createInstallments")}</PrimaryButton>
           </form>
         </Card>
       )}

@@ -160,7 +160,20 @@
     "installmentsCount": "RATENANZAHL",
     "firstDue": "ERSTE FÄLLIGKEIT",
     "estimatedRate": "Geschätzte Rate",
-    "createInstallments": "Ratenkauf erstellen"
+    "createInstallments": "Ratenkauf erstellen",
+    "inputMode": "WIE ERFASSEN?",
+    "modeSplit": "Gesamt + N Raten",
+    "modePaid": "Rate + bezahlt/offen",
+    "modeAmortized": "Finanziert + Zins + Laufzeit",
+    "financedAmount": "FINANZIERTER BETRAG €",
+    "annualRate": "JAHRESZINS %",
+    "durationMonths": "LAUFZEIT (MONATE)",
+    "paidCount": "BEZAHLT",
+    "remainingCount": "OFFEN",
+    "paidSummary": "Bezahlt {{paid}}, offen {{left}}",
+    "historyCategory": "KATEGORIE VERLAUF (OPTIONAL)",
+    "historyCategoryNone": "Keine historischen Buchungen",
+    "modeBare": "Ohne Plan"
   },
   "categories": {
     "kicker": "Ordnen",

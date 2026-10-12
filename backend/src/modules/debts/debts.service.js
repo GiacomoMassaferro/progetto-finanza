@@ -2,6 +2,7 @@ import { AppError } from "../../common/utils/AppError.js";
 import { moneyFromCents, toCents, toMoneyString } from "../../common/utils/money.js";
 import { restore, softDelete, withAlive, withDeleted } from "../../common/utils/softDelete.js";
 import { prisma } from "../../config/prisma.js";
+import { buildAmortization, monthlyDueDates, splitEqual } from "./amortization.js";
 
 // Converte la riga Prisma in oggetto API (BigInt -> string, soldi -> "0.00").
 function toSafePayment(row) {
@@ -137,45 +138,128 @@ export async function create(userId, data) {
     return toSafeDebt(row);
 }
 
-// Crea un debito con N rate mensili in un'unica transazione atomica.
-// Gli importi si dividono in centesimi: rate uguali, l'ultima conguaglia
-// il resto (100.00/3 -> 33.33 + 33.33 + 33.34). Le scadenze sono mensili
-// da firstDueDate (stesso giorno; a cavallo di mesi corti JS normalizza).
+// Crea un debito con rate in un'unica transazione atomica, in 3 modalità:
+// - split: totale diviso in N rate uguali (ultima conguaglia i centesimi).
+// - paid: rata + pagate + rimanenti (ricostruisce totale, residuo e storico;
+//   le pagate storiche nascono PAID senza transazione collegata: esistevano
+//   prima dell'app, non sono movimenti da registrare).
+// - amortized: importo + tasso + durata (piano alla francese via amortization.js,
+//   riusabile dal futuro simulatore). Rata e interessi tornano in risposta.
 export async function createWithInstallments(userId, data) {
-    const totalCents = Math.round(Number(data.totalAmount) * 100);
-    const base = Math.floor(totalCents / data.installments);
-    const amounts = Array.from({ length: data.installments }, (_, i) =>
-        i === data.installments - 1 ? totalCents - base * (data.installments - 1) : base,
-    );
-    const first = new Date(data.firstDueDate);
-    const dueDates = amounts.map((_, i) => new Date(first.getFullYear(), first.getMonth() + i, first.getDate()));
+    const mode = data.mode ?? "split";
+    let total;
+    let schedule;
+    let monthly;
+    let paidCount = 0;
+    // Tasso che ha generato il piano (serve al simulatore/LLM futuri).
+    let planRate = data.interestRate ?? "0.00";
+    // Categoria per le transazioni storiche (solo mode paid, se fornita).
+    let historyCategoryId = null;
 
+    if (mode === "paid") {
+        const amountCents = Math.round(Number(data.installmentAmount) * 100);
+        const count = data.paidCount + data.remainingCount;
+        total = { amount: ((amountCents * count) / 100).toFixed(2), remaining: ((amountCents * data.remainingCount) / 100).toFixed(2) };
+        schedule = monthlyDueDates(new Date(data.firstDueDate), count).map((dueDate, i) => ({
+            amountCents,
+            dueDate,
+            paid: i < data.paidCount,
+        }));
+        monthly = (amountCents / 100).toFixed(2);
+        paidCount = data.paidCount;
+        // Categoria per lo storico: verificata qui (deve essere propria e attiva).
+        if (data.movementsCategoryId !== undefined) {
+            let categoryId;
+            try {
+                categoryId = BigInt(data.movementsCategoryId);
+            } catch {
+                throw new AppError(404, "Categoria non trovata");
+            }
+            const category = await prisma.movementsCategory.findFirst({
+                where: withAlive({ id: categoryId, userId: BigInt(userId) }),
+            });
+            if (!category) {
+                throw new AppError(404, "Categoria non trovata");
+            }
+            historyCategoryId = categoryId;
+        }
+    } else if (mode === "amortized") {
+        const principalCents = Math.round(Number(data.financedAmount) * 100);
+        const rate = Number(data.annualRatePct ?? data.taeg ?? data.tan ?? 0);
+        planRate = rate.toFixed(2);
+        const { schedule: amort, monthlyCents } = buildAmortization({
+            principalCents,
+            annualRatePct: rate,
+            months: data.durationMonths,
+            firstDueDate: new Date(data.firstDueDate),
+        });
+        const totalPaid = amort.reduce((s, r) => s + r.amountCents, 0);
+        total = { amount: (totalPaid / 100).toFixed(2), remaining: (totalPaid / 100).toFixed(2) };
+        schedule = amort.map((r) => ({ ...r, paid: false }));
+        monthly = (monthlyCents / 100).toFixed(2);
+    } else {
+        const totalCents = Math.round(Number(data.totalAmount) * 100);
+        const amounts = splitEqual(totalCents, data.installments);
+        schedule = monthlyDueDates(new Date(data.firstDueDate), data.installments).map((dueDate, i) => ({
+            amountCents: amounts[i],
+            dueDate,
+            paid: false,
+        }));
+        total = { amount: data.totalAmount, remaining: data.totalAmount };
+        monthly = (amounts[0] / 100).toFixed(2);
+    }
+
+    const first = new Date(data.firstDueDate);
     const debt = await prisma.$transaction(async (tx) => {
         const created = await tx.debt.create({
             data: {
                 userId: BigInt(userId),
                 creditorName: data.creditorName,
                 debtType: data.debtType,
-                totalAmount: data.totalAmount,
-                remainingAmount: data.totalAmount,
-                interestRate: data.interestRate ?? "0.00",
+                totalAmount: total.amount,
+                remainingAmount: total.remaining,
+                interestRate: planRate,
                 tan: data.tan ?? null,
                 taeg: data.taeg ?? null,
-                monthlyPayment: (base / 100).toFixed(2),
+                monthlyPayment: monthly,
                 dueDayOfMonth: first.getDate(),
                 startDate: data.startDate,
             },
         });
         await tx.debtPayment.createMany({
-            data: amounts.map((cents, i) => ({
+            data: schedule.map((r) => ({
                 debtId: created.id,
-                amount: (cents / 100).toFixed(2),
-                dueDate: dueDates[i],
+                amount: (r.amountCents / 100).toFixed(2),
+                dueDate: r.dueDate,
+                ...(r.paid ? { status: "PAID", paidDate: r.dueDate } : {}),
             })),
         });
+        // Storico completo (solo paid + categoria): le rate già pagate
+        // ottengono la loro transazione retrodatata, collegata alla rata.
+        // createMany non restituisce gli id: con categoria si crea una a una.
+        if (historyCategoryId) {
+            const paid = await tx.debtPayment.findMany({
+                where: { debtId: created.id, status: "PAID" },
+                orderBy: { dueDate: "asc" },
+            });
+            for (const p of paid) {
+                await tx.transaction.create({
+                    data: {
+                        userId: BigInt(userId),
+                        movementsCategoryId: historyCategoryId,
+                        debtPaymentId: p.id,
+                        amount: p.amount,
+                        type: "EXPENSE",
+                        description: `Pagamento rata ${data.creditorName}`,
+                        transactionDate: p.paidDate ?? p.dueDate,
+                    },
+                });
+            }
+        }
         return created.id;
     });
-    return getById(userId, String(debt));
+    const result = await getById(userId, String(debt));
+    return { ...result, paidCount };
 }
 
 // Modifica parziale, solo su debito proprio e attivo.

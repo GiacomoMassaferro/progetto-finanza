@@ -89,20 +89,47 @@ const debtUpdateSchema = z
     })
     .refine((obj) => Object.keys(obj).length > 0, { message: "nessun campo da aggiornare" });
 
-// Body di POST /debts/with-installments: debito + N rate mensili uguali.
-// Le rate partono da firstDueDate a cadenza mensile; l'ultima conguaglia
-// i centesimi (es. 100/3 -> 33.33 + 33.33 + 33.34).
-const debtWithInstallmentsSchema = z.object({
+// Body di POST /debts/with-installments: 3 modalità a scelta (mode).
+// - split: totale + N rate uguali (l'ultima conguaglia i centesimi).
+// - paid: importo rata + pagate + rimanenti (ricostruisce totale e storico).
+// - amortized: importo finanziato + tasso + durata (piano alla francese).
+const installmentBase = {
     creditorName: debtFields.creditorName,
     debtType: debtFields.debtType,
-    totalAmount: moneyField("totalAmount"),
     interestRate: moneyField("interestRate", { required: false, allowZero: true }),
     tan: moneyField("tan", { required: false, allowZero: true }).nullable().optional(),
     taeg: moneyField("taeg", { required: false, allowZero: true }).nullable().optional(),
     startDate: dateField("startDate"),
-    installments: z.coerce.number().int().min(1).max(60),
-    firstDueDate: dateField("firstDueDate"),
-});
+};
+const debtWithInstallmentsSchema = z.discriminatedUnion("mode", [
+    z.object({
+        ...installmentBase,
+        mode: z.literal("split").default("split"),
+        totalAmount: moneyField("totalAmount"),
+        installments: z.coerce.number().int().min(1).max(60),
+        firstDueDate: dateField("firstDueDate"),
+    }),
+    z.object({
+        ...installmentBase,
+        mode: z.literal("paid"),
+        installmentAmount: moneyField("installmentAmount"),
+        paidCount: z.coerce.number().int().min(0).max(59),
+        remainingCount: z.coerce.number().int().min(1).max(60),
+        firstDueDate: dateField("firstDueDate"),
+        // Categoria per generare le transazioni storiche delle rate già
+        // pagate (opzionale: senza, le pagate restano senza movimento).
+        movementsCategoryId: z.union([z.string(), z.number()]).optional(),
+    }),
+    z.object({
+        ...installmentBase,
+        mode: z.literal("amortized"),
+        financedAmount: moneyField("financedAmount"),
+        // Tasso annuo del piano: usa il TAEG se lo hai, altrimenti il TAN.
+        annualRatePct: moneyField("annualRatePct", { required: false, allowZero: true }),
+        durationMonths: z.coerce.number().int().min(1).max(360),
+        firstDueDate: dateField("firstDueDate"),
+    }),
+]);
 
 // Body di POST /debts/:id/payments: importo e scadenza della rata.
 const paymentCreateSchema = z.object({

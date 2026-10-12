@@ -186,8 +186,21 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-10 | D-16 | profile `language` in DB as source of truth, browser language pre-login, no localStorage | cross-device sync needs server state; logged-out choice is session-only by design (predictable, no stale overrides) |
 | 2026-10-10 | D-17 | LangChain.js router with explicit intent + deterministic stub chains, zod I/O contract | numbers never from LLM (Phase 2 narrative only); same contract covers rules now and LLM later; no auto-apply without user confirm |
 | 2026-10-10 | D-18 | explicit TAN/TAEG columns (legacy `interestRate` kept as fallback) + `SavingsGoal` model; snapshot gains `savingsTotalCents` | the engine needs the true rate for early-payoff math; savings total lets the future LLM judge advance payments without draining the account |
+| 2026-10-10 | D-19 | paid-mode history transactions opt-in (`movementsCategoryId` optional, backdated, same tx) | lifetime cash becomes truthful for importers; skippers keep the old behavior — no forced friction |
 
 ## 5. Changelog (newest first — every entry dated)
+
+
+- **2026-10-10** — Debts single entry point: "+ Nuovo" removed, merged as 4th mode (bare, schedule-less via `POST /debts`) in the adaptive form; i18n ×4 (186); build green.
+- **2026-10-10** — Paid history opt-in:
+
+
+- **2026-10-10** — Paid history opt-in: `movementsCategoryId` optional in paid mode creates backdated linked transactions atomically (D-19); frontend select in paid form; i18n ×4 (185); suite 44/44, build green.
+- **2026-10-10** — Installment input modes:
+
+
+- **2026-10-10** — Installment input modes: `split`/`paid`/`amortized` discriminated union + reusable `amortization.js` (French schedule, simulator-ready), adaptive frontend form with mode selector + live estimates, i18n ×4 (183); suite 42/42, build green.
+- **2026-10-10** — Installment expense tool:
 
 
 - **2026-10-10** — CashPie gains month income slice (center stays current cash); build green.

@@ -160,7 +160,20 @@
     "installmentsCount": "N. CUOTAS",
     "firstDue": "PRIMER VENCIMIENTO",
     "estimatedRate": "Cuota estimada",
-    "createInstallments": "Crear gasto en cuotas"
+    "createInstallments": "Crear gasto en cuotas",
+    "inputMode": "¿CÓMO CARGAR?",
+    "modeSplit": "Total + N cuotas",
+    "modePaid": "Cuota + pagadas/restantes",
+    "modeAmortized": "Financiado + tasa + plazo",
+    "financedAmount": "IMPORTE FINANCIADO €",
+    "annualRate": "TASA ANUAL %",
+    "durationMonths": "PLAZO (MESES)",
+    "paidCount": "PAGADAS",
+    "remainingCount": "RESTANTES",
+    "paidSummary": "Pagado {{paid}}, restan {{left}}",
+    "historyCategory": "CATEGORÍA HISTORIAL (OPCIONAL)",
+    "historyCategoryNone": "Sin movimientos históricos",
+    "modeBare": "Sin plan"
   },
   "categories": {
     "kicker": "Organizar",
