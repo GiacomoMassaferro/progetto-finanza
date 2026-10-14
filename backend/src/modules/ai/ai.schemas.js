@@ -40,6 +40,16 @@ export const suggestionSchema = z.object({
         .optional(),
     savings: z.object({ monthlyAmount: z.string(), note: z.string() }).optional(),
     projectedDebtFree: z.string().nullable().optional(),
+    // Narrativa LLM (Fase 2): null se il provider manca o fallisce.
+    // Le regole restano sempre la base; la narrativa è solo racconto.
+    narrative: z
+        .object({
+            headline: z.string(),
+            explanation: z.string(),
+            tips: z.array(z.string()),
+        })
+        .nullable()
+        .optional(),
 });
 
 // Input del router: chi chiede, cosa chiede, in che lingua rispondere.

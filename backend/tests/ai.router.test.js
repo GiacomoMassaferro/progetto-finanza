@@ -1,5 +1,10 @@
-import { describe, expect, test } from "vitest";
+import { beforeAll, describe, expect, test, vi } from "vitest";
 import { aiRouter } from "../src/modules/ai/router.js";
+
+// I test non toccano mai l'LLM vero: chiave svuotata, provider disattivo.
+beforeAll(() => {
+    vi.stubEnv("GEMINI_API_KEY", "");
+});
 
 // Il router smista ogni intento alla chain giusta e restituisce
 // sempre un output valido (contratto suggestionSchema).

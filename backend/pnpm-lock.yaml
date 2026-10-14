@@ -210,6 +210,9 @@ importers:
       '@langchain/core':
         specifier: ^1.2.17
         version: 1.2.17
+      '@langchain/google-genai':
+        specifier: ^2.3.2
+        version: 2.3.2(@langchain/core@1.2.17)
       '@prisma/adapter-mariadb':
         specifier: 7.10.0
         version: 7.10.0
@@ -270,6 +273,10 @@ packages:
   '@electric-sql/pglite@0.4.3':
     resolution: {integrity: sha512-ichuWTgtd4mOM1G4SpyGJa5trT03lWbMypDV0fUXUCXg5hiHqVAz/bZyV68NqmkLB7WcYmj1RMJVSp8HV/v/ZQ==}
 
+  '@google/generative-ai@0.24.1':
+    resolution: {integrity: sha512-MqO+MLfM6kjxcKoy0p1wRzG3b4ZZXtPI+z2IE26UogS2Cm/XHO+7gGRBh6gcJsOiIVoH93UwKvW4HdgiOZCy9Q==}
+    engines: {node: '>=18.0.0'}
+
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
     engines: {node: '>=6.0.0'}
@@ -283,6 +290,12 @@ packages:
   '@langchain/core@1.2.17':
     resolution: {integrity: sha512-aLQLSed6oLCMLtJHrINhnFmsu79G2UiDlRslbOx+TSN9NmU+WuDv1OtVxrLpYglhXNy53elSduMVk3XBPG9ulw==}
     engines: {node: '>=20'}
+
+  '@langchain/google-genai@2.3.2':
+    resolution: {integrity: sha512-wiiHx3aBJmWJcKmYs/4xZo5KNRICYjdbwegtmH8ega7liYFKBY6e1F4ocMNL+ylApaRIYeO54ceAHNbKmRVHeQ==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@langchain/core': ^1.2.11
 
   '@noble/hashes@1.8.0':
     resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
@@ -1682,6 +1695,8 @@ snapshots:
 
   '@electric-sql/pglite@0.4.3': {}
 
+  '@google/generative-ai@0.24.1': {}
+
   '@jridgewell/resolve-uri@3.1.2': {}
 
   '@jridgewell/sourcemap-codec@1.6.0': {}
@@ -1706,6 +1721,11 @@ snapshots:
       - '@opentelemetry/sdk-trace-base'
       - openai
       - ws
+
+  '@langchain/google-genai@2.3.2(@langchain/core@1.2.17)':
+    dependencies:
+      '@google/generative-ai': 0.24.1
+      '@langchain/core': 1.2.17
 
   '@noble/hashes@1.8.0': {}
 

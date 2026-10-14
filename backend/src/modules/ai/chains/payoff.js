@@ -2,6 +2,7 @@ import { RunnableLambda } from "@langchain/core/runnables";
 import { withAlive } from "../../../common/utils/softDelete.js";
 import { prisma } from "../../../config/prisma.js";
 import { buildPayoffPlan } from "../calculator.js";
+import { narrate } from "../llm/narrative.js";
 
 // Chain payoff: carica i dati dell'utente, calcola il piano valanga e
 // restituisce il formato suggestionSchema (stesso contratto dell'LLM futuro).
@@ -97,7 +98,8 @@ async function runPayoff({ userId, locale }) {
     });
 
     // Adatta il piano interno al contratto uniforme del modulo IA.
-    return {
+    // La narrativa LLM è best-effort: se manca, vale il piano a regole.
+    const base = {
         intent: "payoff",
         locale,
         engine: "rules-avalanche",
@@ -107,6 +109,15 @@ async function runPayoff({ userId, locale }) {
         snapshot: plan.snapshot,
         savings: { monthlyAmount: (plan.savings.monthlyCents / 100).toFixed(2), note: plan.savings.note },
         projectedDebtFree: plan.projectedDebtFree,
+    };
+    const narrative = await narrate(
+        { summary: plan.summary, items: base.items, warnings: plan.warnings, savings: base.savings, projectedDebtFree: plan.projectedDebtFree },
+        plan.snapshot,
+        locale,
+    );
+    return {
+        ...base,
+        ...(narrative ? { engine: "rules-avalanche+gemini", narrative } : { narrative: null }),
     };
 }
 

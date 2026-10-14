@@ -9,7 +9,7 @@
 | Mission | Portal that helps anyone manage debt and save money; AI provides payoff and saving suggestions without worsening the user's finances |
 | Status | Backend foundation done — no auth, no business endpoints yet |
 | Frontend | React + Vite (planned, `frontend/` currently empty) |
-| Last updated | 2026-10-10 |
+| Last updated | 2026-10-13 |
 | Maintainer | @giaco |
 
 ---
@@ -36,7 +36,7 @@
 | Validation | zod | 4.6.5 | all `*.schemas.js` via shared `parseOr400` helper → uniform `AppError(400, details[])` |
 | Rate limit | express-rate-limit | 8.7.1 | 300/15min global on `/api`, 30/15min on `/api/v1/auth`, JSON 429 |
 | Tests (dev) | vitest 5.0.3 + supertest 7.3.1 | `pnpm test` — integration vs real MySQL, throwaway `test-*` users, I-06 cleanup |
-| AI | @langchain/core 1.2.17 | router + specialist runnables, zod-validated I/O; Gemini Flash wired in Phase 2 |
+| AI | @langchain/core 1.2.17 + @langchain/google-genai 2.3.2 | router + specialist runnables, zod-validated I/O; Gemini Flash narrative best-effort (null fallback) |
 | Frontend | React 19 + Vite 8 + react-router 7 + Tailwind 3.4 | JS only, mobile-first, theme tokens from Stitch DESIGN.md, JWT client with auto-refresh |
 | Frontend i18n | i18next + react-i18next | key-based `src/i18n/*.json` (en default + it/es/de, 142 keys), `pnpm i18n:check` parity script, Intl dates/numbers follow language |
 | ORM | Prisma | 7.10.0 | `prisma-client-js` generator, MySQL provider |
@@ -187,20 +187,16 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-10 | D-17 | LangChain.js router with explicit intent + deterministic stub chains, zod I/O contract | numbers never from LLM (Phase 2 narrative only); same contract covers rules now and LLM later; no auto-apply without user confirm |
 | 2026-10-10 | D-18 | explicit TAN/TAEG columns (legacy `interestRate` kept as fallback) + `SavingsGoal` model; snapshot gains `savingsTotalCents` | the engine needs the true rate for early-payoff math; savings total lets the future LLM judge advance payments without draining the account |
 | 2026-10-10 | D-19 | paid-mode history transactions opt-in (`movementsCategoryId` optional, backdated, same tx) | lifetime cash becomes truthful for importers; skippers keep the old behavior — no forced friction |
+| 2026-10-10 | D-20 | Gemini Flash via lazy singleton + zod structured narrative, rules always the base, null fallback | no key/no network never breaks suggest; LLM only narrates precomputed numbers in user locale, max 3 tips |
 
 ## 5. Changelog (newest first — every entry dated)
 
-
-- **2026-10-10** — Debts single entry point: "+ Nuovo" removed, merged as 4th mode (bare, schedule-less via `POST /debts`) in the adaptive form; i18n ×4 (186); build green.
-- **2026-10-10** — Paid history opt-in:
-
-
+- **2026-10-13** — Gemini key diagnosis: `AQ.` format is legitimate (2026 migration AIza→Auth keys); 401 persists on native route via `?key=` and header — key↔service binding issue, I-10 recorded with workarounds; default model → `gemini-3.8-flash`.
+- **2026-10-10** — Phase 2 LLM: `@langchain/google-genai`, lazy Gemini provider (`GEMINI_API_KEY`/`GEMINI_MODEL`), zod narrative merged into payoff (null fallback); 1 fallback test, suite 45/45; fixed 2 broken imports found by the suite.
+- **2026-10-10** — Test hygiene: AI suites stub `GEMINI_API_KEY` (live key hung the suite on 25s LLM timeouts); back to 3.3s.
 - **2026-10-10** — Paid history opt-in: `movementsCategoryId` optional in paid mode creates backdated linked transactions atomically (D-19); frontend select in paid form; i18n ×4 (185); suite 44/44, build green.
-- **2026-10-10** — Installment input modes:
-
-
 - **2026-10-10** — Installment input modes: `split`/`paid`/`amortized` discriminated union + reusable `amortization.js` (French schedule, simulator-ready), adaptive frontend form with mode selector + live estimates, i18n ×4 (183); suite 42/42, build green.
-- **2026-10-10** — Installment expense tool:
+- **2026-10-10** — Debts single entry point: "+ Nuovo" removed, merged as 4th mode (bare, schedule-less via `POST /debts`) in the adaptive form; i18n ×4 (186); build green.
 
 
 - **2026-10-10** — CashPie gains month income slice (center stays current cash); build green.
@@ -314,6 +310,7 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 - Env access only via `src/config/env.js` export — never `process.env` elsewhere.
 - Prisma access only via `src/config/prisma.js` singleton.
 - Migrations: one logical change per migration, descriptive lowercase names (`add_soft_delete`).
+- Tests never touch the real LLM/network: `vi.stubEnv("GEMINI_API_KEY", "")` in every suite invoking AI chains (a live key in `.env` made the suite hang 25s+ per call).
 
 ## 7. Operations runbook
 
@@ -376,6 +373,11 @@ Smoke-test hygiene: `Stop-Job` does NOT kill child `node` processes — kill the
 - **Cause:** `Stop-Job` kills the PowerShell job but orphaned `node` children survive and keep the port with stale code.
 - **Fix / rule:** after smoke tests kill node processes (`Get-Process node | Stop-Process -Force`), or launch the server with `Start-Process` + `Stop-Process -Id` (tracks the exact PID). Always re-run smoke after cleanup.
 
+### I-10 (2026-10-13) — Gemini `AQ.` key rejected with 401 on native route
+- **Symptoms:** `?key=` and `x-goog-api-key` both return 401 UNAUTHENTICATED on `generativelanguage.googleapis.com`.
+- **Cause:** Google migrated AI Studio keys from `AIza` (Standard) to `AQ.` (Auth, service-account bound) in 2026; several reports of new `AQ.` keys failing until restrictions/binding settle. Our key format is legitimate; the failure is on the key↔service binding, not our transport (also updated default model 2.0-flash → 3.8-flash, retired).
+- **Fix / rule:** in AI Studio set key restriction to Generative Language API only; delete stale keys and create fresh; verify API enabled on the project. App side unchanged: null-fallback keeps rules working (see D-20).
+
 ## 9. Backup & recovery
 
 - **DB backup (run before every migration in prod):** `mysqldump -h HOST -u USER -p express_finance > backup_YYYYMMDD.sql`.
@@ -397,7 +399,7 @@ Smoke-test hygiene: `Stop-Job` does NOT kill child `node` processes — kill the
 3. **Validation & support** — zod ✅ 2026-10-08, `trash`/`restore` ✅ 2026-10-08, `rate-limit` ✅ 2026-10-08, seed ✅ 2026-10-08.
 4. **Tooling** — vitest + supertest ✅ 2026-10-08 (14 tests, `pnpm test`); Docker/compose still open.
 5. **Frontend** — F1 ✅, F2 ✅, F3 ✅ 2026-10-10 (transactions/debts/categories pages wired; Stitch sources deleted).
-6. **AI layer** — AI-1a ✅, AI-1b ✅ 2026-10-10 (rules engine + `POST /ai/suggest`) → Phase 2 Gemini Flash narrative (lazy provider, same contract).
+6. **AI layer** — AI-1a ✅, AI-1b ✅, Phase 2 narrative ✅ 2026-10-10 (Gemini Flash best-effort, needs `GEMINI_API_KEY` for live narrative) → UI wiring of narrative card.
 
 ## 12. Glossary
 

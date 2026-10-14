@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { prisma } from "../src/config/prisma.js";
 import { api, bearer, cleanupUser, registerUser, setupSuite, testEmail } from "./helpers.js";
 
@@ -6,6 +6,12 @@ import { api, bearer, cleanupUser, registerUser, setupSuite, testEmail } from ".
 // protezione auth e validazione input.
 
 setupSuite();
+
+// I test non toccano mai l'LLM vero: chiave svuotata, provider disattivo,
+// fallback alle regole (veloce e deterministico anche con chiave reale in .env).
+beforeAll(() => {
+    vi.stubEnv("GEMINI_API_KEY", "");
+});
 
 let email;
 let token;
@@ -35,6 +41,14 @@ describe("POST /api/v1/ai/suggest", () => {
 
     test("401 senza token", async () => {
         await api.post("/api/v1/ai/suggest").send({ intent: "payoff" }).expect(401);
+    });
+
+    test("senza chiave LLM: narrative null, regole intatte (fallback)", async () => {
+        const auth = bearer(await setupUser());
+        const res = await api.post("/api/v1/ai/suggest").set(auth).send({ intent: "payoff", locale: "it" }).expect(200);
+        expect(res.body.data.engine).toBe("rules-avalanche");
+        expect(res.body.data.narrative).toBeNull();
+        expect(res.body.data.summary).toBeTypeOf("string");
     });
 
     test("400 con intento ignoto", async () => {
