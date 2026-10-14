@@ -145,6 +145,11 @@ export const dashboardApi = {
   summary: (month) => api(`/dashboard/summary${month ? `?month=${month}` : ""}`),
 };
 
+export const aiApi = {
+  // Suggerimento payoff nella lingua data (il backend unisce regole + LLM).
+  suggest: (intent = "payoff", locale = "en") => api("/ai/suggest", { method: "POST", body: { intent, locale } }),
+};
+
 export const goalsApi = {
   list: (params = {}) => apiPaged("/goals", params),
   create: (input) => api("/goals", { method: "POST", body: input }),

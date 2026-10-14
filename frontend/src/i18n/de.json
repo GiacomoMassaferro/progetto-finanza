@@ -80,7 +80,9 @@
     "staticBadge": "Statische Vorschau",
     "body": "Designbeispiel: Eine Schuld mit überschüssigen Ersparnissen früh zu tilgen spart Zinsen und schafft monatliche Liquidität. Echte Ratschläge, aus deinen Schulden berechnet, kommen mit der KI-Engine.",
     "apply": "Auf Plan anwenden",
-    "availableWithAI": "Verfügbar mit der KI-Engine"
+    "availableWithAI": "Verfügbar mit der KI-Engine",
+    "loading": "Analyse läuft…",
+    "liveBadge": "Live-Tipp"
   },
   "savings": {
     "kicker": "Sparen",

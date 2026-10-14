@@ -80,7 +80,9 @@
     "staticBadge": "Anteprima statica",
     "body": "Esempio dal design: estinguere in anticipo un debito con i risparmi eccedenti riduce interessi e libera liquidità mensile. I consigli reali, calcolati sui tuoi debiti, arrivano con il motore IA.",
     "apply": "Applica al piano",
-    "availableWithAI": "Disponibile con il motore IA"
+    "availableWithAI": "Disponibile con il motore IA",
+    "loading": "Analisi in corso…",
+    "liveBadge": "Consiglio live"
   },
   "savings": {
     "kicker": "Risparmio",

@@ -36,7 +36,7 @@
 | Validation | zod | 4.6.5 | all `*.schemas.js` via shared `parseOr400` helper → uniform `AppError(400, details[])` |
 | Rate limit | express-rate-limit | 8.7.1 | 300/15min global on `/api`, 30/15min on `/api/v1/auth`, JSON 429 |
 | Tests (dev) | vitest 5.0.3 + supertest 7.3.1 | `pnpm test` — integration vs real MySQL, throwaway `test-*` users, I-06 cleanup |
-| AI | @langchain/core 1.2.17 + @langchain/google-genai 2.3.2 | router + specialist runnables, zod-validated I/O; Gemini Flash narrative best-effort (null fallback) |
+| AI | @langchain/core 1.2.17 + @google/genai (official SDK, Interactions API) | router + specialist runnables, zod-validated I/O; Gemini narrative best-effort (null fallback) |
 | Frontend | React 19 + Vite 8 + react-router 7 + Tailwind 3.4 | JS only, mobile-first, theme tokens from Stitch DESIGN.md, JWT client with auto-refresh |
 | Frontend i18n | i18next + react-i18next | key-based `src/i18n/*.json` (en default + it/es/de, 142 keys), `pnpm i18n:check` parity script, Intl dates/numbers follow language |
 | ORM | Prisma | 7.10.0 | `prisma-client-js` generator, MySQL provider |
@@ -191,6 +191,14 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 
 ## 5. Changelog (newest first — every entry dated)
 
+
+- **2026-10-13** — AI advisor card goes live: `AiAdvisor` calls `POST /ai/suggest` (headline + explanation + tips + warnings), loading state, static fallback when narrative is missing; i18n ×4 (188); build green.
+- **2026-10-13** — Gemini live:
+
+
+- **2026-10-13** — Gemini live: replaced LangChain wrapper with official `@google/genai` Interactions API (the retired `:generateContent` path broke `AQ.` keys); first real narrative verified on Marco data (`rules-avalanche+gemini`, correct figures); suite 45/45.
+
+- **2026-10-13** — Gemini live: replaced LangChain wrapper with official `@google/genai` Interactions API (the retired `:generateContent` path broke `AQ.` keys); first real narrative verified on Marco data (`rules-avalanche+gemini`, correct figures); suite 45/45.
 - **2026-10-13** — Gemini key diagnosis: `AQ.` format is legitimate (2026 migration AIza→Auth keys); 401 persists on native route via `?key=` and header — key↔service binding issue, I-10 recorded with workarounds; default model → `gemini-3.8-flash`.
 - **2026-10-10** — Phase 2 LLM: `@langchain/google-genai`, lazy Gemini provider (`GEMINI_API_KEY`/`GEMINI_MODEL`), zod narrative merged into payoff (null fallback); 1 fallback test, suite 45/45; fixed 2 broken imports found by the suite.
 - **2026-10-10** — Test hygiene: AI suites stub `GEMINI_API_KEY` (live key hung the suite on 25s LLM timeouts); back to 3.3s.
@@ -377,6 +385,7 @@ Smoke-test hygiene: `Stop-Job` does NOT kill child `node` processes — kill the
 - **Symptoms:** `?key=` and `x-goog-api-key` both return 401 UNAUTHENTICATED on `generativelanguage.googleapis.com`.
 - **Cause:** Google migrated AI Studio keys from `AIza` (Standard) to `AQ.` (Auth, service-account bound) in 2026; several reports of new `AQ.` keys failing until restrictions/binding settle. Our key format is legitimate; the failure is on the key↔service binding, not our transport (also updated default model 2.0-flash → 3.8-flash, retired).
 - **Fix / rule:** in AI Studio set key restriction to Generative Language API only; delete stale keys and create fresh; verify API enabled on the project. App side unchanged: null-fallback keeps rules working (see D-20).
+- **Resolution (2026-10-13):** root cause was transport, not key — LangChain's wrapper used retired `:generateContent`; official `@google/genai` SDK via Interactions API (`ai.interactions.create`, JSON-schema `response_format`) works with `AQ.` keys. Verified live: `rules-avalanche+gemini` narrative in Italian on real data.
 
 ## 9. Backup & recovery
 

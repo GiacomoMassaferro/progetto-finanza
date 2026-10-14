@@ -1,7 +1,8 @@
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { env } from "../../../config/env.js";
+import { GoogleGenAI } from "@google/genai";
 
-// Provider LLM pigro: si attiva solo se GEMINI_API_KEY esiste.
+// Provider LLM pigro sull'SDK ufficiale (Interactions API, metodo doc
+// corrente: LangChain usava il vecchio :generateContent, incompatibile
+// con le chiavi AQ.). Si attiva solo se GEMINI_API_KEY esiste.
 // Senza chiave restituisce null e il chiamante usa le regole (mai errori).
 // Una sola istanza condivisa (lazy singleton).
 
@@ -17,20 +18,11 @@ export function getGemini() {
     if (!apiKey) {
         return null;
     }
-    instance = new ChatGoogleGenerativeAI({
-        apiKey,
-        model: process.env.GEMINI_MODEL ?? "gemini-3.8-flash",
-        temperature: 0.2,
-        maxOutputTokens: 1024,
-    });
+    instance = new GoogleGenAI({ apiKey });
     return instance;
 }
 
-// Nome motore per il contratto (regole vs LLM) + env effettivo.
-export function engineInfo() {
-    return {
-        available: getGemini() !== null,
-        model: process.env.GEMINI_MODEL ?? "gemini-3.8-flash",
-        nodeEnv: env.nodeEnv,
-    };
+// Modello da env (default dalla doc ufficiale).
+export function geminiModel() {
+    return process.env.GEMINI_MODEL ?? "gemini-3.8-flash";
 }

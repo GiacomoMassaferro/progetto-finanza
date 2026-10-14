@@ -80,7 +80,9 @@
     "staticBadge": "Vista estática",
     "body": "Ejemplo del diseño: liquidar una deuda con ahorros excedentes reduce intereses y libera liquidez mensual. Los consejos reales, calculados sobre tus deudas, llegan con el motor IA.",
     "apply": "Aplicar al plan",
-    "availableWithAI": "Disponible con el motor IA"
+    "availableWithAI": "Disponible con el motor IA",
+    "loading": "Analizando…",
+    "liveBadge": "Consejo en vivo"
   },
   "savings": {
     "kicker": "Ahorro",

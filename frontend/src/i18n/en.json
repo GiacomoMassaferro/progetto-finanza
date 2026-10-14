@@ -80,7 +80,9 @@
     "staticBadge": "Static preview",
     "body": "Design example: paying off a debt early with excess savings cuts interest and frees monthly cash. Real advice, computed on your debts, arrives with the AI engine.",
     "apply": "Apply to plan",
-    "availableWithAI": "Available with the AI engine"
+    "availableWithAI": "Available with the AI engine",
+    "loading": "Analyzing…",
+    "liveBadge": "Live advice"
   },
   "savings": {
     "kicker": "Saving",
