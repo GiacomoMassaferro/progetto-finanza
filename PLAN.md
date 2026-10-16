@@ -9,7 +9,7 @@
 | Mission | Portal that helps anyone manage debt and save money; AI provides payoff and saving suggestions without worsening the user's finances |
 | Status | Backend foundation done — no auth, no business endpoints yet |
 | Frontend | React + Vite (planned, `frontend/` currently empty) |
-| Last updated | 2026-10-13 |
+| Last updated | 2026-10-15 |
 | Maintainer | @giaco |
 
 ---
@@ -192,13 +192,18 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 ## 5. Changelog (newest first — every entry dated)
 
 
+
+- **2026-10-14** — Gemini quota exhausted by live tests (429, 20 req/day free): documented, fallback verified; AI card shows engine caption for self-diagnosis.
+
+
+- **2026-10-14** — Refresh race fix (I-11): concurrent 401s (StrictMode double-mount) shared one rotation via single-flight instead of double-spending the single-use refresh token; build green.
+
+
 - **2026-10-13** — AI advisor card goes live: `AiAdvisor` calls `POST /ai/suggest` (headline + explanation + tips + warnings), loading state, static fallback when narrative is missing; i18n ×4 (188); build green.
-- **2026-10-13** — Gemini live:
 
 
 - **2026-10-13** — Gemini live: replaced LangChain wrapper with official `@google/genai` Interactions API (the retired `:generateContent` path broke `AQ.` keys); first real narrative verified on Marco data (`rules-avalanche+gemini`, correct figures); suite 45/45.
 
-- **2026-10-13** — Gemini live: replaced LangChain wrapper with official `@google/genai` Interactions API (the retired `:generateContent` path broke `AQ.` keys); first real narrative verified on Marco data (`rules-avalanche+gemini`, correct figures); suite 45/45.
 - **2026-10-13** — Gemini key diagnosis: `AQ.` format is legitimate (2026 migration AIza→Auth keys); 401 persists on native route via `?key=` and header — key↔service binding issue, I-10 recorded with workarounds; default model → `gemini-3.8-flash`.
 - **2026-10-10** — Phase 2 LLM: `@langchain/google-genai`, lazy Gemini provider (`GEMINI_API_KEY`/`GEMINI_MODEL`), zod narrative merged into payoff (null fallback); 1 fallback test, suite 45/45; fixed 2 broken imports found by the suite.
 - **2026-10-10** — Test hygiene: AI suites stub `GEMINI_API_KEY` (live key hung the suite on 25s LLM timeouts); back to 3.3s.
@@ -211,76 +216,52 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 - **2026-10-10** — CashPie fixed: debts count as monthly installment (never full balance), added month expenses slice, available = cash minus rest; i18n ×4 (173); build green.
 
 
-- **2026-10-10** — CashPie fixed: debts count as monthly installment (never full balance), added month expenses slice, available = cash minus rest; i18n ×4 (173); build green.
 - **2026-10-10** — Defensive lifetime default in Dashboard (shows 0.00 instead of white screen on stale backends); debug session green (suite 39/39, build, i18n 172×4, DB clean, no TODOs, only legit console.logs).
-
-
-- **2026-10-10** — Defensive lifetime default in Dashboard (shows 0.00 instead of white screen on stale backends); debug session green (suite 39/39, build, i18n 172×4, DB clean, no TODOs, only legit console.logs).
-- **2026-10-10** — Dashboard cash-flow donut:
 
 
 - **2026-10-10** — CashPie answers "how much money do I have": `summary.lifetime { income, expenses, available }`, donut shows current cash center + available/savings/debts slices; i18n ×4 (172); suite 39/39, build green, live verified (Marco: 1461.25 available).
-- **2026-10-10** — Installment expense tool:
-
-
-- **2026-10-10** — Dashboard cash-flow donut: hand-rolled SVG (`CashPie`) with legend (income/expenses/debts/savings + totals + %), reactive to month and data; i18n ×4 (169); build green.
 - **2026-10-10** — Debts section renamed Rientro→Debiti (IT) + equivalents in en/es/de (nav, kickers); i18n parity green, build green.
 
 
-- **2026-10-10** — Debts section renamed Rientro→Debiti (IT) + equivalents in en/es/de (nav, kickers); i18n parity green, build green.
 - **2026-10-10** — Custom confirm modal replaces `window.confirm` (themed `ConfirmDialog` with Esc/backdrop close, i18n title ×4) in Transactions/Debts/Categories/Savings; build green.
 
 
-- **2026-10-10** — Custom confirm modal replaces `window.confirm` (themed `ConfirmDialog` with Esc/backdrop close, i18n title ×4) in Transactions/Debts/Categories/Savings; build green.
-- **2026-10-10** — Savings CRUD:
 
 
 - **2026-10-10** — Savings CRUD: `src/modules/savings/` (list/get/create/patch/deposit with auto-REACHED, trash/restore, `progressPct`) + `Savings` page (deposit inline, trash) + dashboard wired to real goals + tab; i18n ×4 (160); suite 39/39, build green, live verified.
-- **2026-10-10** — Installment expense tool:
 
 
 - **2026-10-10** — Installment expense tool: `POST /debts/with-installments` (one tx: debt + N monthly installments, last adjusts cents) + Debts form with live rate estimate + i18n ×4 (151); 3 endpoint tests; live verified on :3001 (user server holds :3000 with older code — restart it to pick this up).
-- **2026-10-10** — Debts paid-off view:
 
 
 - **2026-10-10** — Debts paid-off view: Attivi/Estinti/Cestino tabs (`SegmentedTabs`, `?status=PAID_OFF` filter), read-only installments in paid-off view, i18n keys ×4 (145); build green, live verified on Marco data.
-- **2026-10-10** — Cleanup fix:
 
 
 - **2026-10-10** — Cleanup fix: plurals in payoff calculator (1 debito/N debiti, 1 rata/N rate in 4 locales + test), removed dead `dueParts()`, I-09 orphan-node rule; suite 33/33, build green.
-- **2026-10-10** — TAN/TAEG + savings goals:
 
 
 - **2026-10-10** — TAN/TAEG + savings goals: `debts.tan/taeg` nullable (effective rate taeg→tan→interestRate), `savings_goals` model + migration, debt API exposes both, AI snapshot gains `savingsTotalCents`; suite 32/32 green, DB clean.
-- **2026-10-10** — AI-1b:
 
 
 - **2026-10-10** — AI-1b: deterministic avalanche engine (`calculator.js`: rate-order payoff simulation, all surplus → savings fixed rule, aggregate-only LLM snapshot) + real payoff chain + `POST /ai/suggest`; contract extended (warnings/snapshot/savings); 9 new tests, suite 31/31 green; a wrong relative import broke 5 suites, fixed.
-- **2026-10-10** — AI-1a:
 
 
 - **2026-10-10** — AI-1a: `@langchain/core` + intent router (`payoff/savings/chat/unknown`) with deterministic stub chains and zod I/O contract (`src/modules/ai/`); 6 router tests, suite 22/22 green.
-- **2026-10-10** — Profile language:
 
 
 - **2026-10-10** — Profile language: `users.language` + migration, `PATCH /auth/me`, frontend browser-default + login selector + DB sync (no localStorage); backend tests 16/16, E2E verified (en→de→me), build green.
-- **2026-10-10** — Frontend i18n (solution A):
 
 
 - **2026-10-10** — Frontend i18n (solution A): react-i18next, `src/i18n/` with en (default) + it/es/de (142 keys each, `pnpm i18n:check` parity green), all components on `t()`, language selector in header + drawer, Intl numbers/dates follow language; build green, servers verified.
 - **2026-10-10** — Root `package.json` with `pnpm start` launching backend :3000 + frontend :5173 together (`concurrently`); `install:all`, `build`, `test` shortcuts; verified live.
 
 
-- **2026-10-10** — Root `package.json` with `pnpm start` launching backend :3000 + frontend :5173 together (`concurrently`); `install:all`, `build`, `test` shortcuts; verified live.
-- **2026-10-10** — Drawer animation:
 
 
 - **2026-10-10** — Drawer animation: subtle slide-in (200ms) + backdrop fade, quick slide-out (150ms) via CSS keyframes; close on backdrop/×/Esc/route change.
-- **2026-10-10** — Mobile drawer menu replaces bottom tab bar (`AppShell`):
 
 
 - **2026-10-10** — Mobile drawer menu replaces bottom tab bar (`AppShell`): hamburger in header (mobile only), slide-in panel with nav + account + logout, backdrop/Esc/route-change close; desktop top nav unchanged.
-- **2026-10-10** — Frontend fix (I-08):
 
 
 - **2026-10-10** — Frontend fix (I-08): lists crashed with `items.find of undefined` — `api()` dropped `meta` and pages read `.data` off the array; added `apiPaged()` returning `{ items, meta }`, pages adapted; build green, servers verified.
@@ -291,7 +272,6 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 
 - **2026-10-10** — Frontend F2: responsive Dashboard (one page, mobile-first) wired to real data — month selector, 4 KPIs, debts with payoff progress, upcoming/overdue payments, recent transactions; AI advisor + savings goals as marked static placeholders; demo login verified with live summary.
 - **2026-10-10** — Frontend F1: Vite+React+router+Tailwind3 scaffold (JS only, mobile-first), theme from Stitch DESIGN.md (same class names), `src/lib/api.js` (JWT + single-retry refresh), AuthContext, login/register, protected Dashboard placeholder; `pnpm build` green, dev servers verified.
-- **2026-10-08** — Automated tests:
 
 
 - **2026-10-08** — Automated tests: vitest + supertest (`tests/`: auth 7, categories 6, pay 1), real-MySQL integration with throwaway users + I-06 cleanup; found incident I-07 (Decimal→string normalization) fixed via shared `money.js`; 14/14 green, DB clean (demo user only).
@@ -386,6 +366,12 @@ Smoke-test hygiene: `Stop-Job` does NOT kill child `node` processes — kill the
 - **Cause:** Google migrated AI Studio keys from `AIza` (Standard) to `AQ.` (Auth, service-account bound) in 2026; several reports of new `AQ.` keys failing until restrictions/binding settle. Our key format is legitimate; the failure is on the key↔service binding, not our transport (also updated default model 2.0-flash → 3.8-flash, retired).
 - **Fix / rule:** in AI Studio set key restriction to Generative Language API only; delete stale keys and create fresh; verify API enabled on the project. App side unchanged: null-fallback keeps rules working (see D-20).
 - **Resolution (2026-10-13):** root cause was transport, not key — LangChain's wrapper used retired `:generateContent`; official `@google/genai` SDK via Interactions API (`ai.interactions.create`, JSON-schema `response_format`) works with `AQ.` keys. Verified live: `rules-avalanche+gemini` narrative in Italian on real data.
+- **Quota note (2026-10-14):** free tier = 20 req/day on 3.8-flash; live tests exhausted it (429, retry in ~7h). App falls back to rules. Never live-test narrative in loops; vitest stays stubbed.
+
+### I-11 (2026-10-14) — chained 401s after session idle (refresh race)
+- **Symptoms:** console showed repeated 401 on `/auth/me`; dashboard stuck on AI loading.
+- **Cause:** two concurrent requests with an expired access token each spent the single-use refresh token (StrictMode double-mount in dev); the second rotation failed and cleared the session.
+- **Fix:** single-flight refresh in `src/lib/api.js` — concurrent 401s share one rotation. The AI "loading" was just the LLM call taking seconds; static fallback covers real failures.
 
 ## 9. Backup & recovery
 

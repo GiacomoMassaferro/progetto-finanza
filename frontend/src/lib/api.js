@@ -48,18 +48,18 @@ async function request(path, { method = "GET", body, token } = {}) {
   return payload;
 }
 
-// Esegue la chiamata col token dato; su 401 prova UN solo refresh e ripete.
-// Se fallisce ancora, pulisce la sessione (l'utente dovrà riloggarsi).
+// Esegue la chiamata col token dato; su 401 usa il refresh condiviso
+// (single-flight) e ripete una sola volta. Se fallisce, rilancia: sarà
+// singleRefresh a pulire la sessione (l'utente dovrà riloggarsi).
 async function withAuthRetry(fn, options, token) {
   try {
     return await fn(token);
   } catch (err) {
     if (err instanceof ApiError && err.status === 401 && token && !options.retried) {
-      const fresh = await refreshPair().catch(() => null);
+      const fresh = await singleRefresh().catch(() => null);
       if (fresh) {
         return fn(fresh);
       }
-      tokenStore.clear();
     }
     throw err;
   }
@@ -76,12 +76,37 @@ async function refreshPair() {
   return payload.data.tokens.accessToken;
 }
 
+// Un solo refresh alla volta (single-flight): se due chiamate falliscono
+// insieme con 401 (es. doppio mount StrictMode), condividono la stessa
+// rotazione invece di riusare il token già consumato (→ 401 a catena).
+let inflightRefresh = null;
+function singleRefresh() {
+  if (!inflightRefresh) {
+    inflightRefresh = refreshPair().then(
+      (fresh) => {
+        inflightRefresh = null;
+        return fresh;
+      },
+      (err) => {
+        inflightRefresh = null;
+        tokenStore.clear();
+        throw err;
+      },
+    );
+  }
+  return inflightRefresh;
+}
+
 // Entry point per le pagine (risorsa singola): restituisce `data`.
-// Aggiunge il token e, su 401, tenta un refresh prima di arrendersi.
+// Aggiunge il token e, su 401, tenta un refresh condiviso prima di arrendersi.
 export async function api(path, options = {}) {
   const token = options.token ?? tokenStore.getAccess();
-  const payload = await withAuthRetry((t) => request(path, { ...options, token: t }), options, token);
-  return payload.data;
+  try {
+    const payload = await withAuthRetry((t) => request(path, { ...options, token: t }), options, token);
+    return payload.data;
+  } catch (err) {
+    throw err;
+  }
 }
 
 // Entry point per le liste paginate: restituisce { items, meta }.

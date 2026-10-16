@@ -82,7 +82,8 @@
     "apply": "Auf Plan anwenden",
     "availableWithAI": "Verfügbar mit der KI-Engine",
     "loading": "Analyse läuft…",
-    "liveBadge": "Live-Tipp"
+    "liveBadge": "Live-Tipp",
+    "engineLabel": "Engine"
   },
   "savings": {
     "kicker": "Sparen",

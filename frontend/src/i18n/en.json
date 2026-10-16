@@ -82,7 +82,8 @@
     "apply": "Apply to plan",
     "availableWithAI": "Available with the AI engine",
     "loading": "Analyzing…",
-    "liveBadge": "Live advice"
+    "liveBadge": "Live advice",
+    "engineLabel": "Engine"
   },
   "savings": {
     "kicker": "Saving",
