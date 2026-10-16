@@ -82,7 +82,8 @@
     "apply": "Aplicar al plan",
     "availableWithAI": "Disponible con el motor IA",
     "loading": "Analizando…",
-    "liveBadge": "Consejo en vivo"
+    "liveBadge": "Consejo en vivo",
+    "engineLabel": "Motor"
   },
   "savings": {
     "kicker": "Ahorro",

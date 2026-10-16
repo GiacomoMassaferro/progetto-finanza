@@ -69,6 +69,9 @@ export default function AiAdvisor() {
           ))}
         </div>
       )}
+      <p className="mt-space-sm font-body-sm text-body-sm text-on-surface-variant">
+        {t("ai.engineLabel")}: {suggestion.engine}
+      </p>
     </Card>
   );
 }
