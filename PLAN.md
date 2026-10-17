@@ -9,7 +9,7 @@
 | Mission | Portal that helps anyone manage debt and save money; AI provides payoff and saving suggestions without worsening the user's finances |
 | Status | Backend foundation done — no auth, no business endpoints yet |
 | Frontend | React + Vite (planned, `frontend/` currently empty) |
-| Last updated | 2026-10-15 |
+| Last updated | 2026-10-17 |
 | Maintainer | @giaco |
 
 ---
@@ -188,12 +188,11 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-10 | D-18 | explicit TAN/TAEG columns (legacy `interestRate` kept as fallback) + `SavingsGoal` model; snapshot gains `savingsTotalCents` | the engine needs the true rate for early-payoff math; savings total lets the future LLM judge advance payments without draining the account |
 | 2026-10-10 | D-19 | paid-mode history transactions opt-in (`movementsCategoryId` optional, backdated, same tx) | lifetime cash becomes truthful for importers; skippers keep the old behavior — no forced friction |
 | 2026-10-10 | D-20 | Gemini Flash via lazy singleton + zod structured narrative, rules always the base, null fallback | no key/no network never breaks suggest; LLM only narrates precomputed numbers in user locale, max 3 tips |
-| 2026-10-15 | D-21 | FreeLLMAPI chosen as local LLM gateway (over OmniRoute) + IT setup/maintenance guide in `docs/` with PDF export | simpler setup (`.exe`/one-liner vs 359-provider complexity); guide + generator script keep future setup reproducible |
 
 ## 5. Changelog (newest first — every entry dated)
 
 
-- **2026-10-15** — FreeLLMAPI live: Docker Desktop installato, container `freellmapi-freellmapi-1` healthy, dashboard 200, `/v1/models` 401 senza chiave (auth ok), catalogo mensile sincronizzato (I-12 risolto).
+- **2026-10-17** — DB dev ripristinato (I-13): `prisma_user` aveva perso i grant su `express_finance`/`express_finance_shadow` (manteneva solo quelli di altri progetti sullo stesso MySQL); ripristinati i privilegi, suite 45/45 verde.
 
 
 - **2026-10-14** — Gemini quota exhausted by live tests (429, 20 req/day free): documented, fallback verified; AI card shows engine caption for self-diagnosis.
@@ -376,11 +375,10 @@ Smoke-test hygiene: `Stop-Job` does NOT kill child `node` processes — kill the
 - **Cause:** two concurrent requests with an expired access token each spent the single-use refresh token (StrictMode double-mount in dev); the second rotation failed and cleared the session.
 - **Fix:** single-flight refresh in `src/lib/api.js` — concurrent 401s share one rotation. The AI "loading" was just the LLM call taking seconds; static fallback covers real failures.
 
-### I-12 (2026-10-15) — Docker missing on Windows dev PC, FreeLLMAPI live check postponed
-- **Symptoms:** `docker` not recognized in PowerShell 5.1; gateway container cannot start, `/v1/models` check not runnable.
-- **Cause:** Docker Desktop never installed on this machine (Node 24 + Python 3.14 present, so docs + PDF generation worked anyway).
-- **Fix / rule:** documented `.exe` as the recommended path without Docker; Docker one-liner/Compose stays ready in the guide; live verification (dashboard + unified-key smoke test) runs after Docker Desktop install.
-- **Resolution (2026-10-15):** Docker Desktop installato, `docker compose up -d` in `~/freellmapi` ok (container healthy, dashboard 200, `/v1/models` 401 senza chiave come atteso, catalogo `v2026.10.14` sincronizzato). Resta all'utente: creare account, aggiungere chiavi provider, test chat `auto` (guida cap. 6-7).
+### I-13 (2026-10-17) — suite in tilt: `pool timeout` Prisma / access denied su `express_finance`
+- **Symptoms:** 30/45 test failed (`PrismaClientKnownRequestError` code `45028`, `pool timeout: failed to retrieve a connection ... active=0 idle=0 limit=10`); `/ready` e query manuali con `prisma_user` davano `ERROR 1045 Access denied`.
+- **Cause:** sullo stesso MySQL 8.4 nativo (`MySQL84`) convivono più progetti; l'utente `prisma_user` era stato ricreato/ripulito per altri DB (`express_hotel`, `express_pizzeria`) perdendo i grant su `express_finance`/`express_finance_shadow`. Le credenziali in `.env` erano corrette: mancava solo il privilegio.
+- **Fix / rule:** ripristinati `GRANT ALL ON express_finance.*` e `express_finance_shadow.*` a `prisma_user` (host `localhost` e `%`) con `root`; suite 45/45 verde. Regola: `prisma_user` è condiviso tra progetti sullo stesso server — ogni nuovo progetto deve aggiungere i propri grant senza toccare quelli altrui.
 
 ## 9. Backup & recovery
 
@@ -401,7 +399,7 @@ Smoke-test hygiene: `Stop-Job` does NOT kill child `node` processes — kill the
 1. **Auth** — ✅ done 2026-10-08 (`bcryptjs` + JWT access 15m + refresh 7d with rotation; `helmet`/`cors`/`rate-limit` done).
 2. **Domain CRUD** — categories ✅ 2026-10-08, transactions ✅ 2026-10-08, debts+payments ✅ 2026-10-08, `dashboard/summary` ✅ 2026-10-08.
 3. **Validation & support** — zod ✅ 2026-10-08, `trash`/`restore` ✅ 2026-10-08, `rate-limit` ✅ 2026-10-08, seed ✅ 2026-10-08.
-4. **Tooling** — vitest + supertest ✅ 2026-10-08 (14 tests, `pnpm test`); Docker/compose still open.
+4. **Tooling** — vitest + supertest ✅ 2026-10-08 (45 tests, `pnpm test`); Docker/compose still open.
 5. **Frontend** — F1 ✅, F2 ✅, F3 ✅ 2026-10-10 (transactions/debts/categories pages wired; Stitch sources deleted).
 6. **AI layer** — AI-1a ✅, AI-1b ✅, Phase 2 narrative ✅ 2026-10-10 (Gemini Flash best-effort, needs `GEMINI_API_KEY` for live narrative) → UI wiring of narrative card.
 
