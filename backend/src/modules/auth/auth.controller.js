@@ -1,5 +1,11 @@
 import { asyncHandler } from "../../common/utils/asyncHandler.js";
-import { validateLogin, validateMeUpdate, validateRefresh, validateRegister } from "./auth.schemas.js";
+import {
+    validateLogin,
+    validateLogout,
+    validateMeUpdate,
+    validateRefresh,
+    validateRegister,
+} from "./auth.schemas.js";
 import * as authService from "./auth.service.js";
 
 // I controller traducono HTTP <-> service: validano l'input, chiamano il
@@ -30,6 +36,22 @@ export const refresh = asyncHandler(async (req, res) => {
 export const me = asyncHandler(async (req, res) => {
     const user = await authService.me(req.user.id);
     res.json({ data: { user } });
+});
+
+// POST /api/v1/auth/logout (protetta) -> 200: revoca la sessione (refresh
+// token + famiglia). Il client deve chiamarlo: il logout solo client lascerebbe
+// il token valido lato server.
+export const logout = asyncHandler(async (req, res) => {
+    const input = validateLogout(req.body);
+    const result = await authService.logout(input);
+    res.json({ data: result });
+});
+
+// POST /api/v1/auth/logout-all (protetta) -> 200: revoca tutte le sessioni
+// dell'utente (uscire da ogni dispositivo).
+export const logoutAll = asyncHandler(async (req, res) => {
+    const result = await authService.logoutAll(req.user.id);
+    res.json({ data: result });
 });
 
 // PATCH /api/v1/auth/me (protetta) -> 200 + profilo aggiornato.

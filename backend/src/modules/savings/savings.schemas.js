@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { parseOr400 } from "../../common/utils/validate.js";
+// Validatore importi condiviso: vedi common/utils/moneySchema.js.
+import { moneyField } from "../../common/utils/moneySchema.js";
 
 // Validazione degli obiettivi di risparmio con zod. Stesse funzioni
 // ovunque: lanciano AppError 400 oppure restituiscono i dati puliti.
@@ -9,22 +11,7 @@ const GOAL_STATUSES = ["ACTIVE", "REACHED", "ARCHIVED"];
 
 // Importo: numero o stringa numerica, >= 0 (o > 0), max 2 decimali.
 // Restituisce la stringa a 2 decimali (niente float verso il DB).
-function moneyField(field, { required = true, allowZero = false } = {}) {
-    const base = z
-        .union([z.number(), z.string()])
-        .refine(
-            (v) => {
-                const n = Number(v);
-                return Number.isFinite(n) && n >= 0 && (allowZero || n > 0);
-            },
-            { message: `${field} deve essere ${allowZero ? ">= 0" : "> 0"}` },
-        )
-        .refine((v) => Math.round(Number(v) * 100) === Number(v) * 100, {
-            message: `${field} max 2 decimali`,
-        })
-        .transform((v) => Number(v).toFixed(2));
-    return required ? base : base.optional();
-}
+// Validatore condiviso: vedi common/utils/moneySchema.js.
 
 // Interi dai query param (?page, ?limit): arrivano come stringhe.
 const pageSchema = z.coerce.number().int().min(1).default(1);

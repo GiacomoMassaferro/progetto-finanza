@@ -7,9 +7,9 @@
 |---|---|
 | Project (working name) | Project Finance |
 | Mission | Portal that helps anyone manage debt and save money; AI provides payoff and saving suggestions without worsening the user's finances |
-| Status | Backend foundation done — no auth, no business endpoints yet |
-| Frontend | React + Vite (planned, `frontend/` currently empty) |
-| Last updated | 2026-10-17 |
+| Status | MVP live (auth + domain + AI) — audit remediation: correctness/concurrency/security done 2026-10-22 |
+| Frontend | React + Vite (live: auth, dashboard, transactions, debts, categories, goals, AI card) |
+| Last updated | 2026-10-22 |
 | Maintainer | @giaco |
 
 ---
@@ -32,7 +32,7 @@
 | Security | helmet | 8.3.0 | default security headers |
 | CORS | cors | 2.8.6 | `origin: [FRONTEND_URL]` array form — emits ACAO only on match |
 | Hashing | bcryptjs | 3.0.3 | password hashing, cost 10 |
-| Tokens | jsonwebtoken | 9.0.3 | access 15m + refresh 7d, rotation with single use |
+| Tokens | jsonwebtoken | 9.0.3 | access 15m + refresh 1d, rotation with family reuse detection (D-21) |
 | Validation | zod | 4.6.5 | all `*.schemas.js` via shared `parseOr400` helper → uniform `AppError(400, details[])` |
 | Rate limit | express-rate-limit | 8.7.1 | 300/15min global on `/api`, 30/15min on `/api/v1/auth`, JSON 429 |
 | Tests (dev) | vitest 5.0.3 + supertest 7.3.1 | `pnpm test` — integration vs real MySQL, throwaway `test-*` users, I-06 cleanup |
@@ -78,8 +78,12 @@ backend/
 | `DATABASE_HOST/PORT/USER/PASSWORD/NAME` | **yes** | — | runtime adapter; must describe the same DB as `DATABASE_URL` |
 | `DATABASE_SSL` | no | `false` | `true` only in prod with valid certs (see incident I-01) |
 | `FRONTEND_URL` | no | `http://localhost:5173` | single origin allowed by CORS; prod value e.g. `https://app.example.com` |
-| `JWT_SECRET` | **yes** | — | signing secret, min 32 chars (fail-fast at boot); prod value from vault |
-| `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | no | `15m` / `7d` | token lifetimes (`Nm`/`Nh`/`Nd` format) |
+| `JWT_SECRET` | **yes** | — | signing secret, min 32 chars; placeholders (`cambia…`, `changeme`, `secret`, …) and repeated-char values rejected at boot (D-03, §10) |
+| `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | no | `15m` / `1d` | token lifetimes (`Nm`/`Nh`/`Nd` format); refresh rotated on every use, so 1 day is enough |
+| `TRUST_PROXY` | no | `0` | number of trusted reverse proxies (rate limit must see the real client IP; wrong value = spoofable `X-Forwarded-For`) |
+| `SEED_ALLOW_PRODUCTION` | no | — | `1` re-enables `pnpm db:seed` in production (demo user with known password: never by default) |
+| `GEMINI_API_KEY` | no | — | Gemini key; empty ⇒ AI stays on deterministic rules (D-20) |
+| `GEMINI_MODEL` | no | `gemini-3.8-flash` | model used by the narrative layer |
 
 ### 2.4 API (current)
 
@@ -88,9 +92,11 @@ backend/
 | `GET /health` | no | liveness, no DB touch |
 | `GET /ready` | no | readiness, runs `SELECT 1` via Prisma |
 | `GET /api/v1/status` | no | API info (`{ data: { name, version } }`), reachability check for the frontend |
-| `POST /api/v1/auth/register` | no | body `{ email, password≥8, firstName?, lastName? }` → 201 `{ data: { user, tokens } }`, 409 on duplicate email |
-| `POST /api/v1/auth/login` | no | body `{ email, password }` → 200 `{ data: { user, tokens } }`, 401 generic on bad credentials |
-| `POST /api/v1/auth/refresh` | no | body `{ refreshToken }` → 200 new pair (single-use rotation), 401 on reuse/expiry |
+| `POST /api/v1/auth/register` | no | body `{ email, password 8…72 bytes, firstName?, lastName? }` → 201 `{ data: { user, tokens } }`; duplicate email → 409 with a deliberately ambiguous message (no enumeration) |
+| `POST /api/v1/auth/login` | no | body `{ email, password }` → 200 `{ data: { user, tokens } }`, 401 generic on bad credentials (constant-time: dummy bcrypt compare when the email does not exist) |
+| `POST /api/v1/auth/refresh` | no | body `{ refreshToken }` → 200 new pair, same token family; single-use atomic rotation; reuse beyond 30s grace → whole family revoked → 401 |
+| `POST /api/v1/auth/logout` | **yes (Bearer access)** | body `{ refreshToken }` → 200 `{ data: { revoked } }`: revokes the token **and its family** server-side (idempotent) |
+| `POST /api/v1/auth/logout-all` | **yes (Bearer access)** | revokes every active refresh token of the user → 200 `{ data: { revoked: n } }` |
 | `GET /api/v1/auth/me` | **yes (Bearer access)** | 200 `{ data: { user } }`, 401 without/invalid token |
 | `PATCH /api/v1/auth/me` | **yes (Bearer access)** | body `{ language: en\|it\|es\|de }` → 200 `{ data: { user } }`, saved to profile |
 | `GET /api/v1/categories` | **yes** | list own active categories, `?page&limit(max100)&type=`, 200 `{ data: [], meta: { page, limit, total, pages } }` |
@@ -112,7 +118,7 @@ backend/
 | `POST /api/v1/debts/:id/payments` | **yes** | body `{ amount, dueDate }` → 201 `{ data }` |
 | `PATCH /api/v1/debts/:id/payments/:paymentId` | **yes** | partial (PAID without paidDate auto-sets today) → 200 `{ data }` |
 | `POST /api/v1/debts/with-installments` | **yes** | body `{ creditorName, debtType, totalAmount, interestRate?, tan?, taeg?, startDate, installments 1-60, firstDueDate }` → one tx creates debt + N monthly installments (equal, last adjusts cents) → 201 `{ data }` with embedded payments |
-| `POST /api/v1/debts/:id/payments/:paymentId/pay` | **yes** | atomic: mark PAID + create linked EXPENSE transaction + scale remainder; auto `PAID_OFF` at zero → 200 `{ data: { payment, transaction, debt } }`, 409 if already paid |
+| `POST /api/v1/debts/:id/payments/:paymentId/pay` | **yes** | atomic: mark PAID + linked EXPENSE transaction + scale remainder; partial payment keeps the installment open with the residual amount; surplus goes to later open installments; over the debt residual → 400; auto `PAID_OFF` at zero → 200 `{ data: { payment, transaction, debt } }`, 409 if already paid |
 | `POST /api/v1/ai/suggest` | **yes** | body `{ intent=payoff, locale? }` → LangChain router → deterministic avalanche engine on live data → 200 `{ data: { summary, items, warnings, snapshot, savings, projectedDebtFree } }` |
 | `GET /api/v1/dashboard/summary` | **yes** | `?month=YYYY-MM` (default current): income/expenses/balance (exact strings), count, per-category totals with names, active debts (count + total remaining/monthly), overdue count + next 10 payments in 30 days, `lifetime: { income, expenses, available }` (all-time cash) → 200 `{ data }`, 400 on bad month |
 | `GET /api/v1/goals` | **yes** | list own active goals with `progressPct`, `?page&limit(max100)&status` → 200 `{ data: [], meta }` |
@@ -127,7 +133,7 @@ backend/
 | `POST /api/v1/{categories,transactions}/:id/restore` | **yes** | restore from trash → 200 `{ data }`, 404 if active/foreign |
 | `GET /api/v1/debts/trash` | **yes** | soft-deleted debts with their deleted installments → 200 `{ data: [], meta }` |
 | `POST /api/v1/debts/:id/restore` | **yes** | restores debt + installments (one tx) → 200 `{ data }` |
-| `*` unknown | no | `404 { error: { message } }` via `notFound` |
+| `*` unknown | no | `404 { error: { message: "Risorsa non trovata" } }` via `notFound` (URL **not** echoed back) |
 
 Response conventions (binding for all future endpoints): success `{ data, meta? }`, errors `{ error: { message, details? } }`. API versioning prefix: `/api/v1/...`.
 
@@ -141,7 +147,7 @@ Response conventions (binding for all future endpoints): success `{ data, meta? 
 - `SavingsGoal` — per-user, name, targetAmount, currentAmount (default 0), `status: ACTIVE|REACHED|ARCHIVED`
 - `DebtPayment` — installment: amount, dueDate, paidDate?, `status: PENDING|PAID|LATE`
 - `Transaction` — amount, `type: INCOME|EXPENSE`, description?, transactionDate, optional link to DebtPayment
-- `RefreshToken` — per-session row (`tokenHash` unique SHA-256, `expiresAt`); enables revocation + rotation. Ephemeral credential: expired/consumed rows are hard-deleted (exception to soft delete, see D-10)
+- `RefreshToken` — per-session row (`tokenHash` unique SHA-256, `familyId`, `expiresAt`, `usedAt?`, `revokedAt?`); enables revocation, atomic rotation and reuse detection (a stolen reuse revokes the whole family). Ephemeral credential: expired/consumed rows are hard-deleted (exception to soft delete, see D-10/D-21)
 
 Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `deletedAt?` (soft delete). `RefreshToken` is the exception (ephemeral credential, see D-10). FK deletes: `Cascade` on `userId`/`debtId`, `Restrict` on `Transaction→MovementsCategory` (never silently lose history), `SetNull` on `Transaction→DebtPayment`.
 
@@ -155,6 +161,7 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-08 | `20261008172500_add_refresh_tokens` | `refresh_tokens` table (hash unique, expiry + indexes) |
 | 2026-10-10 | `20261010080732_add_user_language` | `users.language` VARCHAR(2) default `en` |
 | 2026-10-10 | `20261010095609_add_tan_taeg_savings_goals` | `debts.tan/taeg` nullable + `savings_goals` table (target/current, status, soft delete) |
+| 2026-10-22 | `20261022114425_add_refresh_token_family_reuse` | `refresh_tokens`: `family_id` (backfilled from `SHA2(token_hash)` for existing rows), `used_at`, `revoked_at` + index on `family_id` |
 
 ### 3.3 Soft-delete policy (binding)
 
@@ -188,10 +195,21 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-10 | D-18 | explicit TAN/TAEG columns (legacy `interestRate` kept as fallback) + `SavingsGoal` model; snapshot gains `savingsTotalCents` | the engine needs the true rate for early-payoff math; savings total lets the future LLM judge advance payments without draining the account |
 | 2026-10-10 | D-19 | paid-mode history transactions opt-in (`movementsCategoryId` optional, backdated, same tx) | lifetime cash becomes truthful for importers; skippers keep the old behavior — no forced friction |
 | 2026-10-10 | D-20 | Gemini Flash via lazy singleton + zod structured narrative, rules always the base, null fallback | no key/no network never breaks suggest; LLM only narrates precomputed numbers in user locale, max 3 tips |
+| 2026-10-22 | D-21 | Refresh tokens get a `familyId`; rotation consumes the token with a conditional `UPDATE … WHERE used_at IS NULL` inside a transaction; reuse beyond a 30s grace revokes the whole family | concurrent refreshes (two tabs) no longer double-spend the token, and a stolen token can be cut off together with the legit chain; the grace window avoids logging out honest duplicate requests |
+| 2026-10-22 | D-22 | One money validator (`moneyField`/`money.js`) for every amount, `MAX_AMOUNT = 99999999.99`, Italian/EU formats accepted, ambiguous thousands rejected | `Decimal(10,2)` overflow must be a 400, not a 500; float drift and `"1.234"` ambiguity are handled in one place instead of per schema |
+| 2026-10-22 | D-23 | Optimistic concurrency (`updateMany` with the read value in the WHERE) + bounded retry instead of version columns or row locks | no migration, works with MySQL default isolation; conflicting payments retry or return 409, never lose a deposit |
+| 2026-10-22 | D-24 | LLM narrative is post-validated against a whitelist of numbers taken from the rule engine; creditor names are replaced by anonymous labels; 15s timeout | the model can no longer invent figures (discarded → rules stay), and user-controlled strings never enter the prompt (prompt injection + D-17 minimization) |
+| 2026-10-22 | D-25 | TAEG is treated as an **effective** annual rate (`(1+t)^(1/12)-1`), TAN as nominal (`t/12`); single precedence TAEG > TAN > legacy `interestRate` for both the amortization plan and the simulator | the plan and the payoff simulation now use the same rate; a 12% TAEG no longer costs as much as a 12% nominal loan |
+| 2026-10-22 | D-26 | Tokens stay in `localStorage` for now (access 15m + rotated refresh, server-side revocation on logout); httpOnly+SameSite cookie + CSRF token remains an open decision | moving to cookies changes CORS/CSRF on both sides; the audit gap is documented in §10 instead of silently half-fixing it |
 
 ## 5. Changelog (newest first — every entry dated)
 
 
+- **2026-10-22** — Audit remediation (correctness/concurrency): single money validator with `MAX_AMOUNT` (D-22), atomic `pay()`/`deposit()` with optimistic retry (D-23), partial payment + surplus handling, `simulate()` rewritten (no `stuck` lies, single warning, `null` instead of fake debt-free dates, no inflated interest), month arithmetic clamped, TAEG treated as effective rate with one precedence rule (D-25); 66 tests green.
+- **2026-10-22** — Audit remediation (security): refresh-token families + reuse detection + `logout`/`logout-all` (D-21, migration `20261022114425`), constant-time login, ambiguous 409 on register, password cap 72 bytes, 404 without echoed URL, Prisma error mapping, trusted proxy, limiter on `/ready`, seed blocked outside dev, JWT secret rejects placeholders/weak values, refresh TTL default `1d`; new `auth.security.test.js`; 76 tests green.
+- **2026-10-22** — Audit remediation (AI): narrative whitelisted against the rule-engine numbers, anonymized creditor labels, 15s timeout, stricter zod caps; new `ai.llm.guardrails.test.js`.
+- **2026-10-22** — Test isolation: `vitest.config.js` sets `GEMINI_API_KEY=""` (dotenv does not override) — the suite had started hitting the real Gemini API (80s, flaky); back to 82/82 in 6.8s (13 files).
+- **2026-10-22** — Frontend logout is now a real server-side revocation: `authApi.logout(refreshToken, accessToken)`, local state cleared first so the UI reacts immediately; known residual gap (tokens in `localStorage`) documented in D-26/§10.
 - **2026-10-17** — DB dev ripristinato (I-13): `prisma_user` aveva perso i grant su `express_finance`/`express_finance_shadow` (manteneva solo quelli di altri progetti sullo stesso MySQL); ripristinati i privilegi, suite 45/45 verde.
 
 
@@ -380,6 +398,16 @@ Smoke-test hygiene: `Stop-Job` does NOT kill child `node` processes — kill the
 - **Cause:** sullo stesso MySQL 8.4 nativo (`MySQL84`) convivono più progetti; l'utente `prisma_user` era stato ricreato/ripulito per altri DB (`express_hotel`, `express_pizzeria`) perdendo i grant su `express_finance`/`express_finance_shadow`. Le credenziali in `.env` erano corrette: mancava solo il privilegio.
 - **Fix / rule:** ripristinati `GRANT ALL ON express_finance.*` e `express_finance_shadow.*` a `prisma_user` (host `localhost` e `%`) con `root`; suite 45/45 verde. Regola: `prisma_user` è condiviso tra progetti sullo stesso server — ogni nuovo progetto deve aggiungere i propri grant senza toccare quelli altrui.
 
+### I-14 (2026-10-22) — 500 `Unknown argument familyId` right after the refresh-token migration
+- **Symptoms:** `POST /auth/refresh` / login 500 with `PrismaClientValidationError: Unknown argument 'familyId'`; migration applied and DB column present.
+- **Cause:** `prisma migrate dev` updated the database but the generated client in `node_modules` still came from the old schema (the dev server had also cached the old client).
+- **Fix / rule:** always run `pnpm --dir backend exec prisma generate` after any `schema.prisma` change (and restart the dev server); the generated client is not tracked by git, so a pull that changes the schema requires it too.
+
+### I-15 (2026-10-22) — suite went from 7s to 80s and became flaky
+- **Symptoms:** `pnpm test` took ~80s, some AI tests timed out; `engine` in responses was `rules-avalanche+gemini` even though the tests had stubbed the key.
+- **Cause:** moving the Gemini key to `env.js` (validated at import time) changed the read order: `dotenv` loads `.env` but does **not** override variables already set by `vi.stubEnv`, and after the refactor the key was read from the real `.env` (live 429s + 15s timeouts).
+- **Fix / rule:** set `GEMINI_API_KEY: ""` in `vitest.config.js` `test.env` (applied before any import) and keep tests hermetic; never live-test the narrative in loops (I-10 quota).
+
 ## 9. Backup & recovery
 
 - **DB backup (run before every migration in prod):** `mysqldump -h HOST -u USER -p express_finance > backup_YYYYMMDD.sql`.
@@ -389,19 +417,23 @@ Smoke-test hygiene: `Stop-Job` does NOT kill child `node` processes — kill the
 
 ## 10. Security notes (current gaps — see roadmap)
 
-- `.env` holds plaintext dev credentials — never commit (gitignored); prod secrets go to a vault/env manager.
-- Auth live since 2026-10-08 (register/login/refresh/me, rotation, bcrypt cost 10). **All new `/api/v1` domain routes must require the `auth` middleware.** Rate limiting active (global + auth). Remaining: none on this front.
+- `.env` holds plaintext dev credentials — never commit (gitignored); prod secrets go to a vault/env manager. `JWT_SECRET` is validated at boot: placeholders (`changeme`, `cambia…`, `secret`, …) and low-entropy values are rejected (D-03).
+- Auth live since 2026-10-08 (register/login/refresh/me, rotation, bcrypt cost 10). **All new `/api/v1` domain routes must require the `auth` middleware.** Rate limiting active: global + strict on auth + 60/min probe on `/ready`. Access token 15m, refresh 1d rotated with reuse detection (D-21); `logout` revokes the family, `logout-all` every session.
+- Enumeration: login is constant-time (dummy bcrypt for unknown emails), register answers 409 with the same generic message, `notFound` no longer echoes the URL, 5xx never leak stack traces in production.
 - Local `DATABASE_SSL=false` is dev-only; prod DB connections must use `DATABASE_SSL=true` with valid certs.
-- `express.json({ limit: "100kb" })` + `x-powered-by` disabled + `helmet` headers + CORS restricted to `FRONTEND_URL` (array form, see I-05). `rate-limit` still to add with the auth step.
+- `express.json({ limit: "100kb" })` + `x-powered-by` disabled + `helmet` headers + CORS restricted to `FRONTEND_URL` (array form, see I-05). `TRUST_PROXY` must match the real proxy chain, otherwise rate-limit keys are spoofable.
+- **Open gaps:** frontend keeps access+refresh tokens in `localStorage` (XSS ⇒ token theft; migration to httpOnly+SameSite cookies + CSRF token not started, D-26); no account lockout/backoff after repeated failed logins; no 2FA; password blacklist absent.
+- **AI:** the narrative is never trusted for numbers (whitelist), user-controlled strings are anonymized before reaching Gemini, 15s timeout, key read only from `env.js`.
 
 ## 11. Roadmap
 
-1. **Auth** — ✅ done 2026-10-08 (`bcryptjs` + JWT access 15m + refresh 7d with rotation; `helmet`/`cors`/`rate-limit` done).
+1. **Auth** — ✅ done 2026-10-08 (`bcryptjs` + JWT access 15m + refresh 1d with rotation; `helmet`/`cors`/`rate-limit` done); hardened 2026-10-22 (families, reuse detection, logout/logout-all, constant-time login).
 2. **Domain CRUD** — categories ✅ 2026-10-08, transactions ✅ 2026-10-08, debts+payments ✅ 2026-10-08, `dashboard/summary` ✅ 2026-10-08.
-3. **Validation & support** — zod ✅ 2026-10-08, `trash`/`restore` ✅ 2026-10-08, `rate-limit` ✅ 2026-10-08, seed ✅ 2026-10-08.
-4. **Tooling** — vitest + supertest ✅ 2026-10-08 (45 tests, `pnpm test`); Docker/compose still open.
-5. **Frontend** — F1 ✅, F2 ✅, F3 ✅ 2026-10-10 (transactions/debts/categories pages wired; Stitch sources deleted).
+3. **Validation & support** — zod ✅ 2026-10-08, `trash`/`restore` ✅ 2026-10-08, `rate-limit` ✅ 2026-10-08, seed ✅ 2026-10-08 (prod guard 2026-10-22).
+4. **Tooling** — vitest + supertest ✅ 2026-10-08, 82 tests 2026-10-22; Docker/compose still open.
+5. **Frontend** — F1 ✅, F2 ✅, F3 ✅ 2026-10-10 (transactions/debts/categories pages wired; Stitch sources deleted); server-side logout ✅ 2026-10-22.
 6. **AI layer** — AI-1a ✅, AI-1b ✅, Phase 2 narrative ✅ 2026-10-10 (Gemini Flash best-effort, needs `GEMINI_API_KEY` for live narrative) → UI wiring of narrative card.
+7. **Audit remediation** — correctness/concurrency/security/AI guardrails ✅ 2026-10-22; open: httpOnly cookie migration (D-26), login lockout, Docker/compose.
 
 ## 12. Glossary
 

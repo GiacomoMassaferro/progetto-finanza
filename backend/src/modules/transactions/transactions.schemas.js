@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { parseOr400 } from "../../common/utils/validate.js";
+// Validatore importi condiviso: vedi common/utils/moneySchema.js.
+import { moneyField } from "../../common/utils/moneySchema.js";
 
 // Validazione di body e query delle transazioni con zod. Stesse funzioni
 // di prima: lanciano AppError 400 oppure restituiscono i dati puliti.
@@ -8,22 +10,7 @@ const TYPES = ["INCOME", "EXPENSE"];
 
 // Importo: numero o stringa numerica, > 0 (o >= 0), max 2 decimali.
 // Restituisce la stringa a 2 decimali (niente float verso il DB).
-function moneyField(field, { required = true, allowZero = false } = {}) {
-    const base = z
-        .union([z.number(), z.string()])
-        .refine(
-            (v) => {
-                const n = Number(v);
-                return Number.isFinite(n) && n >= 0 && (allowZero || n > 0);
-            },
-            { message: `${field} deve essere ${allowZero ? ">= 0" : "> 0"}` },
-        )
-        .refine((v) => Math.round(Number(v) * 100) === Number(v) * 100, {
-            message: `${field} max 2 decimali`,
-        })
-        .transform((v) => Number(v).toFixed(2));
-    return required ? base : base.optional();
-}
+// Validatore condiviso: vedi common/utils/moneySchema.js.
 
 // Data ISO (YYYY-MM-DD o datetime): deve esistere davvero -> Date.
 function dateField(field, { required = true } = {}) {

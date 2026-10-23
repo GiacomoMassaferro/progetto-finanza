@@ -1,12 +1,22 @@
 // Seed dimostrativo: utente demo + categorie + transazioni + debito con rate.
 // Idempotente: se l'utente demo esiste già, non fa niente.
-// Esecuzione: pnpm db:seed — credenziali demo@example.com / DemoPass123.
+// Esecuzione: pnpm db:seed → credenziali demo@example.com / DemoPass123.
 import bcrypt from "bcryptjs";
+import { env } from "../src/config/env.js";
 import { prisma } from "../src/config/prisma.js";
 
 const DEMO_EMAIL = "demo@example.com";
 
 async function main() {
+    // Il seed crea un utente con password nota: in produzione sarebbe una
+    // porta di servizio aperta. Si può forzare solo con un flag esplicito.
+    if (!env.isDev && !env.seedAllowProduction) {
+        throw new Error(
+            "Seed disabilitato in produzione: crea un utente demo con password nota. " +
+                "Se serve davvero: SEED_ALLOW_PRODUCTION=1 pnpm db:seed",
+        );
+    }
+
     const existing = await prisma.user.findUnique({ where: { email: DEMO_EMAIL } });
     if (existing) {
         console.log(`Seed saltato: ${DEMO_EMAIL} esiste già.`);

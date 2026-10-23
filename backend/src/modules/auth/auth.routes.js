@@ -13,4 +13,9 @@ router.post("/refresh", authController.refresh);
 router.get("/me", auth, authController.me);
 router.patch("/me", auth, authController.updateMe);
 
+// Logout: revoca lato server la sessione (il refresh token e la sua famiglia).
+router.post("/logout", auth, authController.logout);
+// Logout da tutti i dispositivi: revoca tutte le sessioni attive.
+router.post("/logout-all", auth, authController.logoutAll);
+
 export default router;

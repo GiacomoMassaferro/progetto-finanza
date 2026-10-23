@@ -7,7 +7,10 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api/v1";
 const ACCESS_KEY = "pf.accessToken";
 const REFRESH_KEY = "pf.refreshToken";
 
-// Token in localStorage (prototipo: ok; in produzione valutare httpOnly cookie).
+// Token in localStorage: accesso breve + refresh ruotato lato server.
+// RISCHIO NOTO (PLAN §10, D-24): con XSS il token è leggibile. La difesa
+// definitiva è il cookie httpOnly+SameSite (richiede CSRF token): scelta
+// ancora aperta, qui il logout revoca comunque la sessione sul server.
 export const tokenStore = {
   getAccess: () => localStorage.getItem(ACCESS_KEY),
   getRefresh: () => localStorage.getItem(REFRESH_KEY),
@@ -130,6 +133,13 @@ export const authApi = {
   me: (token) => api("/auth/me", { token }),
   // Salva la lingua preferita nel profilo (segue l'utente su ogni dispositivo).
   updateMe: (input) => api("/auth/me", { method: "PATCH", body: input }),
+  // Revoca lato server la sessione: senza questa chiamata il refresh token
+  // resterebbe valido anche dopo il logout dal dispositivo. I token sono
+  // passati esplicitamente perché lo stato locale viene già pulito.
+  logout: (refreshToken, accessToken) =>
+    api("/auth/logout", { method: "POST", body: { refreshToken }, token: accessToken }),
+  // Chiude tutte le sessioni dell'utente (tutti i dispositivi).
+  logoutAll: () => api("/auth/logout-all", { method: "POST" }),
 };
 
 // --- Risorse protette (il token lo mette api/apiPaged da sole) ---

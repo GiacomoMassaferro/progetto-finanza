@@ -5,7 +5,7 @@ import { env } from "./config/env.js";
 import { prisma } from "./config/prisma.js";
 import { errorHandler } from "./common/middlewares/errorHandler.js";
 import { notFound } from "./common/middlewares/notFound.js";
-import { apiLimiter } from "./common/middlewares/rateLimit.js";
+import { apiLimiter, probeLimiter } from "./common/middlewares/rateLimit.js";
 import { asyncHandler } from "./common/utils/asyncHandler.js";
 import v1Routes from "./routes/v1.js";
 
@@ -13,6 +13,10 @@ export function createApp() {
     const app = express();
 
     app.disable("x-powered-by");
+    // Dietro reverse proxy (nginx, ingress, load balancer): gli header
+    // X-Forwarded-For servono a ricavare l'IP reale nei rate limit.
+    // Il numero di hop è configurabile (0 = nessun proxy fidato).
+    app.set("trust proxy", env.trustProxy);
     // Security headers (helmet) + JSON + CORS verso il frontend.
     app.use(helmet());
     app.use(express.json({ limit: "100kb" }));
@@ -30,9 +34,11 @@ export function createApp() {
         }),
     );
 
-    // Sonda di readiness: DB raggiungibile via Prisma.
+    // Sonda di readiness: DB raggiungibile via Prisma. Con tetto anti-abuso
+    // perché tocca il DB a ogni richiesta.
     app.get(
         "/ready",
+        probeLimiter,
         asyncHandler(async (_req, res) => {
             await prisma.$queryRaw`SELECT 1`;
             res.json({ status: "ready", db: "up" });

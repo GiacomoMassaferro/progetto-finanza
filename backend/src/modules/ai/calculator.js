@@ -9,6 +9,8 @@
 // 3. Liquidità totale (entrate - uscite da sempre) esposta nello snapshot:
 //    servirà all'LLM per non suggerire movimenti che svuotano il conto.
 
+import { monthlyRate } from "../../common/utils/rates.js";
+
 // Testi per locale (stesse 4 lingue della UI).
 const STRINGS = {
     it: {
@@ -16,13 +18,18 @@ const STRINGS = {
             n === 1
                 ? `Piano valanga su 1 debito: estinzione stimata ${when}, interessi stimati ${interest}. Extra mensili ${savings} destinati al risparmio.`
                 : `Piano valanga su ${n} debiti: estinzione stimata ${when}, interessi stimati ${interest}. Extra mensili ${savings} destinati al risparmio.`,
+        // Piano senza data di estinzione: almeno un debito non si estingue.
+        summaryNever: (n, interest, savings) =>
+            `Piano valanga su ${n} ${n === 1 ? "debito" : "debiti"}: nessuna estinzione raggiungibile con le rate minime, interessi stimati ${interest}. Extra mensili ${savings} destinati al risparmio.`,
         noDebts: "Nessun debito attivo: niente da estinguere.",
         itemDetail: (when) => `Estinto a ${when} con la strategia valanga`,
+        itemDetailNever: "Non estinguibile con le rate minime",
         warnOverdue: (n) => (n === 1 ? "1 rata scaduta: pagala prima di tutto" : `${n} rate scadute: pagale prima di tutto`),
         warnNegative: "Spendi più di quanto guadagni: il piano non regge",
         warnLiquidity: "La liquidità non copre le scadenze dei prossimi 30 giorni",
         warnDti: "Le rate superano il 36% delle entrate: soglia di rischio",
         warnStuck: "la rata minima non copre gli interessi",
+        warnTooLong: "non si estingue entro 50 anni",
         savingsNote: "Extra mensili destinati al risparmio (regola fissa)",
         savingsZero: "Nessun surplus mensile: prima rientra nelle spese",
     },
@@ -31,13 +38,17 @@ const STRINGS = {
             n === 1
                 ? `Avalanche plan on 1 debt: payoff around ${when}, estimated interest ${interest}. Monthly surplus ${savings} goes to savings.`
                 : `Avalanche plan on ${n} debts: payoff around ${when}, estimated interest ${interest}. Monthly surplus ${savings} goes to savings.`,
+        summaryNever: (n, interest, savings) =>
+            `Avalanche plan on ${n} ${n === 1 ? "debt" : "debts"}: no payoff reachable with minimum payments, estimated interest ${interest}. Monthly surplus ${savings} goes to savings.`,
         noDebts: "No active debts: nothing to pay off.",
         itemDetail: (when) => `Paid off by ${when} with the avalanche strategy`,
+        itemDetailNever: "Not payable off with minimum payments",
         warnOverdue: (n) => (n === 1 ? "1 overdue installment: pay it first" : `${n} overdue installments: pay them first`),
         warnNegative: "You spend more than you earn: the plan does not hold",
         warnLiquidity: "Cash does not cover the next 30 days of due dates",
         warnDti: "Installments exceed 36% of income: risk threshold",
         warnStuck: "minimum payment does not cover interest",
+        warnTooLong: "not payable off within 50 years",
         savingsNote: "Monthly surplus goes to savings (fixed rule)",
         savingsZero: "No monthly surplus: cut spending first",
     },
@@ -46,13 +57,17 @@ const STRINGS = {
             n === 1
                 ? `Plan avalancha sobre 1 deuda: liquidación estimada ${when}, intereses estimados ${interest}. Excedente mensual ${savings} al ahorro.`
                 : `Plan avalancha sobre ${n} deudas: liquidación estimada ${when}, intereses estimados ${interest}. Excedente mensual ${savings} al ahorro.`,
+        summaryNever: (n, interest, savings) =>
+            `Plan avalancha sobre ${n} ${n === 1 ? "deuda" : "deudas"}: no hay liquidación alcanzable con las cuotas mínimas, intereses estimados ${interest}. Excedente mensual ${savings} al ahorro.`,
         noDebts: "Sin deudas activas: nada que liquidar.",
         itemDetail: (when) => `Liquidada en ${when} con la estrategia avalancha`,
+        itemDetailNever: "No liquidable con las cuotas mínimas",
         warnOverdue: (n) => (n === 1 ? "1 cuota vencida: págala primero" : `${n} cuotas vencidas: págalas primero`),
         warnNegative: "Gastas más de lo que ganas: el plan no se sostiene",
         warnLiquidity: "La liquidez no cubre los vencimientos de 30 días",
         warnDti: "Las cuotas superan el 36% de los ingresos: umbral de riesgo",
         warnStuck: "la cuota mínima no cubre los intereses",
+        warnTooLong: "no se liquida en 50 años",
         savingsNote: "Excedente mensual al ahorro (regla fija)",
         savingsZero: "Sin excedente mensual: recorta gastos primero",
     },
@@ -61,13 +76,17 @@ const STRINGS = {
             n === 1
                 ? `Avalanche-Plan für 1 Schuld: Tilgung ca. ${when}, geschätzte Zinsen ${interest}. Monatsüberschuss ${savings} geht ans Sparen.`
                 : `Avalanche-Plan für ${n} Schulden: Tilgung ca. ${when}, geschätzte Zinsen ${interest}. Monatsüberschuss ${savings} geht ans Sparen.`,
+        summaryNever: (n, interest, savings) =>
+            `Avalanche-Plan für ${n} ${n === 1 ? "Schuld" : "Schulden"}: keine Tilgung mit den Mindestzahlungen erreichbar, geschätzte Zinsen ${interest}. Monatsüberschuss ${savings} geht ans Sparen.`,
         noDebts: "Keine aktiven Schulden: nichts zu tilgen.",
         itemDetail: (when) => `Getilgt bis ${when} mit der Avalanche-Strategie`,
+        itemDetailNever: "Mit Mindestzahlungen nicht tilgbar",
         warnOverdue: (n) => (n === 1 ? "1 überfällige Rate: zuerst zahlen" : `${n} überfällige Raten: zuerst zahlen`),
         warnNegative: "Du gibst mehr aus als du verdienst: Plan hält nicht",
         warnLiquidity: "Liquidität deckt die nächsten 30 Tage nicht",
         warnDti: "Raten über 36% des Einkommens: Risikoschwelle",
         warnStuck: "Mindestrate deckt die Zinsen nicht",
+        warnTooLong: "nicht innerhalb von 50 Jahren getilgt",
         savingsNote: "Monatsüberschuss ans Sparen (feste Regel)",
         savingsZero: "Kein Überschuss: erst Ausgaben senken",
     },
@@ -93,28 +112,37 @@ function monthPlus(n) {
     d.setMonth(d.getMonth() + n);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
+// Limite di simulazione: 50 anni di rate mensili (600 mesi).
+const MAX_MONTHS = 600;
 
 // Simula l'ammortamento a rate minime in ordine di tasso (valanga).
-// debts: [{ id, creditorName, remainingCents, annualRatePct, monthlyCents }].
+// debts: [{ id, creditorName, remainingCents, annualRatePct, monthlyCents,
+//           rateKind? }] dove rateKind = "nominal" (TAN) o "effective" (TAEG).
 // Ritorna [{ ...debt, payoffMonth (0-based) o null se mai, interestCents }].
 function simulate(debts, warnings, t) {
     const ordered = [...debts].sort((a, b) => b.annualRatePct - a.annualRatePct || a.remainingCents - b.remainingCents);
-    const state = ordered.map((d) => ({ ...d, left: d.remainingCents, interest: 0, payoffMonth: null }));
-    for (let m = 0; m < 600 && state.some((d) => d.left > 0); m++) {
+    const state = ordered.map((d) => ({ ...d, left: d.remainingCents, interest: 0, payoffMonth: null, stuck: false }));
+    for (let m = 0; m < MAX_MONTHS && state.some((d) => d.left > 0); m++) {
         for (const d of state) {
-            if (d.left <= 0) {
+            if (d.left <= 0 || d.stuck) {
+                // stuck: gia' segnalato e senza fine (non simulare oltre).
                 continue;
             }
-            // Interesse mensile sul residuo (tasso nominale da annualRatePct).
-            const interest = Math.round((d.left * d.annualRatePct) / 12 / 100);
+            // Interesse mensile sul residuo: TAN -> tasso/12, TAEG -> (1+t)^(1/12)-1.
+            const rate = monthlyRate(d.annualRatePct, d.rateKind ?? "nominal");
+            const interest = Math.round(d.left * rate);
             d.left += interest;
             d.interest += interest;
             const pay = Math.min(d.monthlyCents, d.left);
             if (pay <= interest && d.annualRatePct > 0) {
-                // Ammortamento negativo: la rata non intacca mai il capitale.
+                // Ammortamento negativo: la rata non intacca mai il capitale,
+                // quindi il debito non si estingue MAI. Lo segnalo una volta
+                // sola (prima l'avviso si ripeteva per 600 mesi) e azzero il
+                // residuo per non far gonfiare gli interessi stimati.
                 warnings.push(`${d.creditorName}: ${t.warnStuck}`);
                 d.left = d.remainingCents;
                 d.payoffMonth = null;
+                d.stuck = true;
                 continue;
             }
             d.left -= pay;
@@ -122,6 +150,14 @@ function simulate(debts, warnings, t) {
                 d.left = 0;
                 d.payoffMonth = d.payoffMonth ?? m;
             }
+        }
+    }
+    // Debiti che non si estinguono entro l'orizzonte simulato: avviso dedicato.
+    for (const d of state) {
+        if (d.left > 0 && !d.stuck) {
+            warnings.push(`${d.creditorName}: ${t.warnTooLong}`);
+            d.stuck = true;
+            d.payoffMonth = null;
         }
     }
     return state;
@@ -148,8 +184,11 @@ export function buildPayoffPlan({ debts, snapshot, locale = "en" }) {
     }
 
     const simulated = simulate(active, warnings, t);
+    // Un debito non estinguibile (rata minima < interesse, o termine troppo
+    // lungo) rende impossibile una data di estinzione: il piano non ha fine.
+    const neverCount = simulated.filter((d) => d.payoffMonth === null).length;
     const lastMonth = Math.max(0, ...simulated.map((d) => d.payoffMonth ?? 0));
-    const debtFree = monthPlus(lastMonth);
+    const debtFree = neverCount > 0 ? null : monthPlus(lastMonth);
     const totalInterest = simulated.reduce((s, d) => s + d.interest, 0);
     const surplus = snapshot.monthIncomeCents - snapshot.monthExpensesCents;
 
@@ -167,11 +206,19 @@ export function buildPayoffPlan({ debts, snapshot, locale = "en" }) {
         warnings.push(t.warnDti);
     }
 
+    const summary =
+        debtFree === null
+            ? t.summaryNever(active.length, eur(totalInterest, locale), eur(Math.max(0, surplus), locale))
+            : t.summary(active.length, monthLabel(debtFree, locale), eur(totalInterest, locale), eur(Math.max(0, surplus), locale));
+
     return {
-        summary: t.summary(active.length, monthLabel(debtFree, locale), eur(totalInterest, locale), eur(Math.max(0, surplus), locale)),
+        summary,
         items: simulated.map((d) => ({
             title: d.creditorName,
-            detail: t.itemDetail(d.payoffMonth === null ? "—" : monthLabel(monthPlus(d.payoffMonth), locale)),
+            detail:
+                d.payoffMonth === null
+                    ? t.itemDetailNever
+                    : t.itemDetail(monthLabel(monthPlus(d.payoffMonth), locale)),
             amount: (d.remainingCents / 100).toFixed(2),
         })),
         warnings,

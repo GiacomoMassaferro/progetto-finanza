@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { env } from "../../../config/env.js";
 
 // Provider LLM pigro sull'SDK ufficiale (Interactions API, metodo doc
 // corrente: LangChain usava il vecchio :generateContent, incompatibile
@@ -14,7 +15,8 @@ export function getGemini() {
         return instance;
     }
     attempted = true;
-    const apiKey = process.env.GEMINI_API_KEY;
+    // La chiave arriva solo da env.js (mai process.env sparpagliato).
+    const apiKey = env.geminiApiKey;
     if (!apiKey) {
         return null;
     }
@@ -24,5 +26,5 @@ export function getGemini() {
 
 // Modello da env (default dalla doc ufficiale).
 export function geminiModel() {
-    return process.env.GEMINI_MODEL ?? "gemini-3.8-flash";
+    return env.geminiModel;
 }

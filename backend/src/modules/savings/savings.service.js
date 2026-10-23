@@ -1,5 +1,6 @@
 import { AppError } from "../../common/utils/AppError.js";
-import { toMoneyString } from "../../common/utils/money.js";
+import { moneyFromCents, toCents, toMoneyString } from "../../common/utils/money.js";
+import { ConflictError, withOptimisticRetry } from "../../common/utils/optimisticRetry.js";
 import { restore, softDelete, withAlive, withDeleted } from "../../common/utils/softDelete.js";
 import { prisma } from "../../config/prisma.js";
 
@@ -85,18 +86,26 @@ export async function update(userId, id, data) {
 
 // Versa una somma: si somma all'accantonato; al raggiungimento
 // dell'obiettivo lo stato passa da solo a REACHED.
+// Lock ottimistico: due depositi concorrenti non devono sovrascrivere
+// l'accantonato (prima il secondo perdeva il primo versamento).
 export async function deposit(userId, id, amount) {
-    const goal = await findGoal(userId, id);
-    const current = Math.round(Number(goal.currentAmount) * 100) + Math.round(Number(amount) * 100);
-    const target = Math.round(Number(goal.targetAmount) * 100);
-    const row = await prisma.savingsGoal.update({
-        where: { id: goal.id },
-        data: {
-            currentAmount: (current / 100).toFixed(2),
-            ...(current >= target ? { status: "REACHED" } : {}),
-        },
+    return withOptimisticRetry(async () => {
+        const goal = await findGoal(userId, id);
+        const current = toCents(goal.currentAmount) + toCents(amount);
+        const target = toCents(goal.targetAmount);
+        const updated = await prisma.savingsGoal.updateMany({
+            where: { id: goal.id, currentAmount: goal.currentAmount },
+            data: {
+                currentAmount: moneyFromCents(current),
+                ...(current >= target ? { status: "REACHED" } : {}),
+            },
+        });
+        if (updated.count === 0) {
+            throw new ConflictError("Obiettivo aggiornato in parallelo: riprova");
+        }
+        const row = await prisma.savingsGoal.findFirst({ where: withAlive({ id: goal.id }) });
+        return toSafeGoal(row);
     });
-    return toSafeGoal(row);
 }
 
 // Cancellazione logica (soft delete): la riga resta per l'assistenza.

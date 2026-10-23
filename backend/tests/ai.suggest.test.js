@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
+import { afterAll, describe, expect, test } from "vitest";
 import { prisma } from "../src/config/prisma.js";
 import { api, bearer, cleanupUser, registerUser, setupSuite, testEmail } from "./helpers.js";
 
@@ -7,11 +7,8 @@ import { api, bearer, cleanupUser, registerUser, setupSuite, testEmail } from ".
 
 setupSuite();
 
-// I test non toccano mai l'LLM vero: chiave svuotata, provider disattivo,
-// fallback alle regole (veloce e deterministico anche con chiave reale in .env).
-beforeAll(() => {
-    vi.stubEnv("GEMINI_API_KEY", "");
-});
+// L'LLM vero è disattivato per tutti i test in vitest.config.js (chiave
+// vuota): qui si verifica solo il percorso a regole deterministiche.
 
 let email;
 let token;

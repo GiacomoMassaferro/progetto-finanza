@@ -17,3 +17,12 @@ export const authLimiter = rateLimit({
     standardHeaders: "draft-8",
     message: { error: { message: "Troppi tentativi di accesso, riprova più tardi" } },
 });
+
+// Tetto sulle sonde di readiness: /ready tocca il DB, quindi senza tetto
+// diventa un facile amplificatore di carico (DoS sul database).
+export const probeLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 60,
+    standardHeaders: "draft-8",
+    message: { error: { message: "Troppe richieste, riprova più tardi" } },
+});

@@ -76,14 +76,22 @@ async function runPayoff({ userId, locale }) {
     });
 
     const plan = buildPayoffPlan({
-        debts: debts.map((d) => ({
-            id: String(d.id),
-            creditorName: d.creditorName,
-            remainingCents: Math.round(Number(d.remainingAmount) * 100),
-            // Tasso effettivo: TAEG > TAN > legacy interestRate.
-            annualRatePct: Number(d.taeg ?? d.tan ?? d.interestRate),
-            monthlyCents: Math.round(Number(d.monthlyPayment) * 100),
-        })),
+        debts: debts.map((d) => {
+            // Precedenza unica del tasso (stessa di debts.service.js): TAEG
+            // (effettivo) > TAN (nominale) > interestRate legacy. Il simulatore
+            // deve usare lo stesso tasso del piano rateale (bug A5).
+            const taeg = d.taeg === null || d.taeg === undefined ? null : Number(d.taeg);
+            const tan = d.tan === null || d.tan === undefined ? null : Number(d.tan);
+            return {
+                id: String(d.id),
+                creditorName: d.creditorName,
+                remainingCents: Math.round(Number(d.remainingAmount) * 100),
+                annualRatePct: taeg ?? tan ?? Number(d.interestRate),
+                // Il TAEG e' un tasso effettivo: il tasso mensile e' (1+t)^(1/12)-1.
+                rateKind: taeg !== null ? "effective" : "nominal",
+                monthlyCents: Math.round(Number(d.monthlyPayment) * 100),
+            };
+        }),
         snapshot: {
             availableNowCents: lifeIncome - lifeExpenses,
             monthIncomeCents: monthIncome,

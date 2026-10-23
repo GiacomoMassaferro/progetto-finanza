@@ -51,9 +51,17 @@ export function AuthProvider({ children }) {
     return me;
   }, []);
 
-  const logout = useCallback(() => {
+  // Logout: pulisce subito lo stato locale (l'utente esce anche se la rete
+  // è lenta) e poi revoca la sessione sul server. I token vengono letti
+  // prima della pulizia e passati esplicitamente.
+  const logout = useCallback(async () => {
+    const refreshToken = tokenStore.getRefresh();
+    const accessToken = tokenStore.getAccess();
     tokenStore.clear();
     setUser(null);
+    if (refreshToken) {
+      await authApi.logout(refreshToken, accessToken).catch(() => {});
+    }
   }, []);
 
   return <AuthContext.Provider value={{ user, loading, login, register, logout }}>{children}</AuthContext.Provider>;

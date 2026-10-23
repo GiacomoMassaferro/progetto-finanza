@@ -1,5 +1,7 @@
 import { AppError } from "../../common/utils/AppError.js";
 import { moneyFromCents, toCents, toMoneyString } from "../../common/utils/money.js";
+import { ConflictError, withOptimisticRetry } from "../../common/utils/optimisticRetry.js";
+import { nominalAnnualFromEffective } from "../../common/utils/rates.js";
 import { restore, softDelete, withAlive, withDeleted } from "../../common/utils/softDelete.js";
 import { prisma } from "../../config/prisma.js";
 import { buildAmortization, monthlyDueDates, splitEqual } from "./amortization.js";
@@ -185,11 +187,20 @@ export async function createWithInstallments(userId, data) {
         }
     } else if (mode === "amortized") {
         const principalCents = Math.round(Number(data.financedAmount) * 100);
-        const rate = Number(data.annualRatePct ?? data.taeg ?? data.tan ?? 0);
-        planRate = rate.toFixed(2);
+        // Precedenza unica del tasso (stessa del simulatore payoff, vedi A5):
+        // TAEG (effettivo) > TAN (nominale) > tasso esplicito della richiesta.
+        // Il piano alla francese usa sempre un TAN nominale: se arriva il TAEG
+        // si converte nel TAN equivalente (stesso tasso mensile reale).
+        const taegPct = data.taeg !== undefined && data.taeg !== null ? Number(data.taeg) : null;
+        const tanPct = data.tan !== undefined && data.tan !== null ? Number(data.tan) : null;
+        const explicitPct = data.annualRatePct !== undefined ? Number(data.annualRatePct) : null;
+        const nominalRate = taegPct !== null
+            ? nominalAnnualFromEffective(taegPct)
+            : (tanPct ?? explicitPct ?? 0);
+        planRate = nominalRate.toFixed(2);
         const { schedule: amort, monthlyCents } = buildAmortization({
             principalCents,
-            annualRatePct: rate,
+            annualRatePct: nominalRate,
             months: data.durationMonths,
             firstDueDate: new Date(data.firstDueDate),
         });
@@ -355,55 +366,130 @@ export async function updatePayment(userId, debtId, paymentId, data) {
     return toSafePayment(row);
 }
 
-// Paga una rata: marca PAID + crea la transazione collegata + scala il
-// residuo del debito. Tutto in una transazione atomica (o tutto o niente).
+// Paga una rata: applica il pagamento al piano, crea la transazione collegata
+// e scala il residuo del debito. Tutto in una transazione atomica (o tutto o
+// niente) e con lock ottimistico: due pagamenti concorrenti non possono
+// doppio-pagare la stessa rata ne' perdere un aggiornamento del residuo.
 // Se il residuo arriva a zero il debito passa a PAID_OFF da solo.
+//
+// Regole di importo:
+// - non si paga piu' di quanto si deve (la transazione non puo' superare
+//   il residuo: prima poteva registrare 500 su un debito da 300);
+// - pagamento parziale: la rata resta PENDING/LATE con l'importo residuo,
+//   non viene data per estinta (prima si perdeva la parte non versata);
+// - eccedenza: ripartita sulle rate successive dello stesso debito.
 export async function pay(userId, debtId, paymentId, data) {
-    const debt = await findDebt(userId, debtId);
-    const payment = await findPayment(debt.id, paymentId);
-    if (payment.status === "PAID") {
-        throw new AppError(409, "Rata già pagata");
-    }
     const categoryId = await checkCategory(userId, data.movementsCategoryId);
-    const paidCents = data.amount ? toCents(data.amount) : toCents(payment.amount);
-    const paidDate = data.paidDate ?? new Date();
-    const remainingCents = Math.max(0, toCents(debt.remainingAmount) - paidCents);
 
-    const result = await prisma.$transaction(async (tx) => {
-        const paid = await tx.debtPayment.update({
-            where: { id: payment.id },
-            data: { status: "PAID", paidDate, amount: moneyFromCents(paidCents) },
+    // Il tentativo ripete la lettura: al conflitto ricalcola su dati freschi.
+    return withOptimisticRetry(async () => {
+        const debt = await findDebt(userId, debtId);
+        const payment = await findPayment(debt.id, paymentId);
+        if (payment.status === "PAID") {
+            throw new AppError(409, "Rata già pagata");
+        }
+        const rateCents = toCents(payment.amount);
+        const debtCents = toCents(debt.remainingAmount);
+        const requestedCents = data.amount ? toCents(data.amount) : rateCents;
+
+        // Tetto: mai piu' del residuo (il denaro non sparisce nel nulla).
+        if (requestedCents > debtCents) {
+            throw new AppError(400, `Importo superiore al residuo del debito (${moneyFromCents(debtCents)})`);
+        }
+
+        const paidDate = data.paidDate ?? new Date();
+        // Quanto va sulla rata target e quanto resta da ripartire sulle altre.
+        const toRate = Math.min(requestedCents, rateCents);
+        const surplus = requestedCents - toRate;
+        const partial = toRate < rateCents;
+
+        const result = await prisma.$transaction(async (tx) => {
+            // 1) Lock ottimistico sulla rata: se un altro pagamento l'ha gia'
+            //    chiusa, count = 0 -> conflitto (niente doppio pagamento).
+            const rateUpdate = await tx.debtPayment.updateMany({
+                where: { id: payment.id, status: { not: "PAID" } },
+                data: {
+                    status: partial ? payment.status : "PAID",
+                    ...(partial ? {} : { paidDate }),
+                    amount: moneyFromCents(partial ? rateCents - toRate : rateCents),
+                },
+            });
+            if (rateUpdate.count === 0) {
+                throw new ConflictError("Rata già pagata o aggiornata in parallelo");
+            }
+
+            // 2) Eccedenza: ripartita sulle rate successive dello stesso debito,
+            //    cosi' il piano resta allineato al residuo reale.
+            let rest = surplus;
+            if (rest > 0) {
+                const next = await tx.debtPayment.findMany({
+                    where: withAlive({
+                        debtId: debt.id,
+                        id: { not: payment.id },
+                        status: { not: "PAID" },
+                    }),
+                    orderBy: { dueDate: "asc" },
+                });
+                for (const p of next) {
+                    if (rest <= 0) break;
+                    const pCents = toCents(p.amount);
+                    const take = Math.min(rest, pCents);
+                    rest -= take;
+                    const left = pCents - take;
+                    await tx.debtPayment.update({
+                        where: { id: p.id },
+                        data: {
+                            amount: moneyFromCents(left),
+                            ...(left === 0 ? { status: "PAID", paidDate } : {}),
+                        },
+                    });
+                }
+            }
+
+            // 3) Lock ottimistico sul debito: il residuo letto prima della
+            //    transazione potrebbe essere cambiato nel frattempo.
+            const newRemaining = debtCents - requestedCents;
+            const debtUpdate = await tx.debt.updateMany({
+                where: { id: debt.id, remainingAmount: debt.remainingAmount },
+                data: {
+                    remainingAmount: moneyFromCents(newRemaining),
+                    // Debito estinto: chiudi anche lo stato, senza intervento manuale.
+                    ...(newRemaining === 0 ? { status: "PAID_OFF" } : {}),
+                },
+            });
+            if (debtUpdate.count === 0) {
+                throw new ConflictError("Debito aggiornato in parallelo: riprova");
+            }
+
+            // 4) Transazione collegata: importo = quanto l'utente ha versato.
+            const transaction = await tx.transaction.create({
+                data: {
+                    userId: BigInt(userId),
+                    movementsCategoryId: categoryId,
+                    debtPaymentId: payment.id,
+                    amount: moneyFromCents(requestedCents),
+                    type: "EXPENSE",
+                    description: data.description ?? `Pagamento rata ${debt.creditorName}`,
+                    transactionDate: paidDate,
+                },
+            });
+
+            const updatedDebt = await tx.debt.findFirst({
+                where: withAlive({ id: debt.id }),
+                include: { payments: { where: withAlive(), orderBy: { dueDate: "asc" } } },
+            });
+            const updatedPayment = await tx.debtPayment.findFirst({ where: withAlive({ id: payment.id }) });
+            return { transaction, updatedDebt, updatedPayment };
         });
-        const transaction = await tx.transaction.create({
-            data: {
-                userId: BigInt(userId),
-                movementsCategoryId: categoryId,
-                debtPaymentId: payment.id,
-                amount: moneyFromCents(paidCents),
-                type: "EXPENSE",
-                description: data.description ?? `Pagamento rata ${debt.creditorName}`,
-                transactionDate: paidDate,
+
+        return {
+            payment: toSafePayment(result.updatedPayment),
+            transaction: {
+                id: String(result.transaction.id),
+                amount: toMoneyString(result.transaction.amount),
+                debtPaymentId: String(result.transaction.debtPaymentId),
             },
-        });
-        const updatedDebt = await tx.debt.update({
-            where: { id: debt.id },
-            data: {
-                remainingAmount: moneyFromCents(remainingCents),
-                // Debito estinto: chiudi anche lo stato, senza intervento manuale.
-                ...(remainingCents === 0 ? { status: "PAID_OFF" } : {}),
-            },
-            include: { payments: { where: withAlive(), orderBy: { dueDate: "asc" } } },
-        });
-        return { paid, transaction, updatedDebt };
+            debt: toSafeDebt(result.updatedDebt),
+        };
     });
-
-    return {
-        payment: toSafePayment(result.paid),
-        transaction: {
-            id: String(result.transaction.id),
-            amount: toMoneyString(result.transaction.amount),
-            debtPaymentId: String(result.transaction.debtPaymentId),
-        },
-        debt: toSafeDebt(result.updatedDebt),
-    };
 }
