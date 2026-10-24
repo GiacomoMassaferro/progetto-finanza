@@ -4,6 +4,9 @@ node_modules/
 # Segreti: mai committare i .env reali (usare .env.example come riferimento)
 .env
 !.env.example
+# Ambiente di test delle migrazioni (contiene credenziali locali)
+.env.test
+!.env.test.example
 
 # Documento personale da colloquio, non parte del progetto
 architettura-backend.pdf

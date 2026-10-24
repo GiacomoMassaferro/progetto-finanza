@@ -24,9 +24,12 @@ export function setupSuite() {
 export const testEmail = (prefix) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
 
 // Registra un utente e restituisce { user, tokens }.
+// `x-auth-mode: bearer` tiene il contratto storico (token nel body, niente
+// cookie): le suite esistenti non cambiano con l'introduzione del cookie mode.
 export async function registerUser(email) {
     const res = await api
         .post("/api/v1/auth/register")
+        .set("x-auth-mode", "bearer")
         .send({ email, password: "TestPass123" })
         .expect(201);
     return res.body.data;

@@ -9,6 +9,21 @@ import { apiLimiter, probeLimiter } from "./common/middlewares/rateLimit.js";
 import { asyncHandler } from "./common/utils/asyncHandler.js";
 import v1Routes from "./routes/v1.js";
 
+// Origin su loopback con qualsiasi porta (solo sviluppo): Vite slitta di
+// porta se la 5173 è occupata. In produzione serve un unico origin esplicito.
+function isLoopbackOrigin(origin) {
+    try {
+        const url = new URL(origin);
+        const isHttp = url.protocol === "http:" || url.protocol === "https:";
+        return (
+            isHttp &&
+            ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname.toLowerCase())
+        );
+    } catch {
+        return false;
+    }
+}
+
 export function createApp() {
     const app = express();
 
@@ -20,9 +35,24 @@ export function createApp() {
     // Security headers (helmet) + JSON + CORS verso il frontend.
     app.use(helmet());
     app.use(express.json({ limit: "100kb" }));
-    // Array (non stringa): cors emette ACAO solo se l'Origin
-    // coincide, altrimenti nessun header per origini estranee.
-    app.use(cors({ origin: [env.frontendUrl] }));
+    // Chiamata con l'Origin richiesto: ACAO viene emesso solo se coincide con
+    // `FRONTEND_URL` (in sviluppo anche con loopback su altra porta, D-29),
+    // altrimenti nessun header per origini estranee.
+    // credentials: i cookie di sessione (refresh/CSRF) devono viaggiare
+    // anche quando frontend e API sono su porte/origini diverse (D-28).
+    app.use(
+        cors({
+            origin(origin, callback) {
+                if (!origin) return callback(null, false);
+                if (origin === env.frontendUrl) return callback(null, true);
+                if (env.corsAllowLoopback && isLoopbackOrigin(origin)) {
+                    return callback(null, true);
+                }
+                return callback(null, false);
+            },
+            credentials: true,
+        }),
+    );
     // Anti-abuso globale sulle API (il tetto stretto sull'auth sta in routes/v1.js).
     app.use("/api/", apiLimiter);
 

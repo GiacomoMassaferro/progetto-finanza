@@ -68,6 +68,7 @@ describe("POST /api/v1/auth/logout-all", () => {
         // Seconda sessione: login da un altro dispositivo.
         const second = await api
             .post("/api/v1/auth/login")
+            .set("x-auth-mode", "bearer")
             .send({ email: user.email, password: PASSWORD })
             .expect(200);
         await api

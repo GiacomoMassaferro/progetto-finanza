@@ -29,11 +29,12 @@ const registerSchema = z.object({
 // Body di POST /auth/login: solo credenziali.
 const loginSchema = z.object({ email: emailSchema, password: passwordSchema });
 
-// Body di POST /auth/refresh: il refresh token da ruotare.
-const refreshSchema = z.object({ refreshToken: z.string().min(1, "refreshToken mancante") });
+// Body di POST /auth/refresh: in modalità cookie il token arriva dal cookie
+// httpOnly, quindi il body può essere assente. Se c'è deve essere valido.
+const refreshSchema = z.object({ refreshToken: z.string().min(1, "refreshToken mancante").optional() });
 
-// Body di POST /auth/logout: il refresh token della sessione da chiudere.
-const logoutSchema = z.object({ refreshToken: z.string().min(1, "refreshToken mancante") });
+// Body di POST /auth/logout: stessa regola (cookie browser oppure token esplicito).
+const logoutSchema = z.object({ refreshToken: z.string().min(1, "refreshToken mancante").optional() });
 
 // Body di PATCH /auth/me: solo la lingua (stesso set dei JSON frontend).
 const meUpdateSchema = z.object({ language: z.enum(["en", "it", "es", "de"]) });

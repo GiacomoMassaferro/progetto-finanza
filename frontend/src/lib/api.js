@@ -1,28 +1,26 @@
 // Client HTTP verso il backend (stesso formato ovunque: { data } ok,
 // { error: { message, details? } } ko). Solo fetch, nessuna dipendenza.
+//
+// Sessione (D-28): il refresh token vive in un cookie HttpOnly impostato dal
+// server e JavaScript non può leggerlo. Qui teniamo SOLO l'access token, in
+// memoria: si perde al reload e si recupera con restoreSession() (che usa il
+// cookie). Niente localStorage: un XSS non trova credenziali da rubare.
 
-// Base URL dall'env Vite (VITE_API_URL) o default sviluppo locale.
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api/v1";
 
-const ACCESS_KEY = "pf.accessToken";
-const REFRESH_KEY = "pf.refreshToken";
+// Cookie leggibile impostato dal server: da rimandare in `x-csrf-token`.
+const CSRF_COOKIE = "pf_csrf";
 
-// Token in localStorage: accesso breve + refresh ruotato lato server.
-// RISCHIO NOTO (PLAN §10, D-24): con XSS il token è leggibile. La difesa
-// definitiva è il cookie httpOnly+SameSite (richiede CSRF token): scelta
-// ancora aperta, qui il logout revoca comunque la sessione sul server.
-export const tokenStore = {
-  getAccess: () => localStorage.getItem(ACCESS_KEY),
-  getRefresh: () => localStorage.getItem(REFRESH_KEY),
-  set: ({ accessToken, refreshToken }) => {
-    localStorage.setItem(ACCESS_KEY, accessToken);
-    localStorage.setItem(REFRESH_KEY, refreshToken);
-  },
-  clear: () => {
-    localStorage.removeItem(ACCESS_KEY);
-    localStorage.removeItem(REFRESH_KEY);
-  },
-};
+// Access token corrente (in memoria del modulo, mai persistito).
+let accessToken = null;
+
+export function setAccessToken(token) {
+  accessToken = token ?? null;
+}
+
+export function clearAccessToken() {
+  accessToken = null;
+}
 
 // Errore con status HTTP: i componenti distinguono 401/404/409 dal message.
 export class ApiError extends Error {
@@ -33,14 +31,27 @@ export class ApiError extends Error {
   }
 }
 
+// Legge il token CSRF dal cookie (double-submit: il server lo confronta).
+function readCsrfToken() {
+  if (typeof document === "undefined") {
+    return null;
+  }
+  const match = document.cookie.match(new RegExp(`(?:^|; )${CSRF_COOKIE}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 // Chiamata singola: access token nell'header, JSON in/out.
-// Restituisce il payload intero { data, meta? }: lo spacchettano api/apiPaged.
-async function request(path, { method = "GET", body, token } = {}) {
+// `credentials: "include"` fa viaggiare i cookie di sessione anche quando
+// frontend (5173) e API (3000) sono su origini diverse.
+async function request(path, { method = "GET", body, token, csrf = false } = {}) {
+  const csrfToken = csrf ? readCsrfToken() : null;
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(csrfToken ? { "x-csrf-token": csrfToken } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
@@ -51,48 +62,28 @@ async function request(path, { method = "GET", body, token } = {}) {
   return payload;
 }
 
-// Esegue la chiamata col token dato; su 401 usa il refresh condiviso
-// (single-flight) e ripete una sola volta. Se fallisce, rilancia: sarà
-// singleRefresh a pulire la sessione (l'utente dovrà riloggarsi).
-async function withAuthRetry(fn, options, token) {
-  try {
-    return await fn(token);
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 401 && token && !options.retried) {
-      const fresh = await singleRefresh().catch(() => null);
-      if (fresh) {
-        return fn(fresh);
-      }
-    }
-    throw err;
-  }
-}
-
-// Rinnova la coppia di token col refresh (uso singolo, rotazione lato server).
-async function refreshPair() {
-  const refreshToken = tokenStore.getRefresh();
-  if (!refreshToken) {
-    throw new ApiError(401, { error: { message: "Sessione scaduta" } });
-  }
-  const payload = await request("/auth/refresh", { method: "POST", body: { refreshToken } });
-  tokenStore.set(payload.data.tokens);
-  return payload.data.tokens.accessToken;
+// Rinnova la sessione col cookie httpOnly: il server ruota refresh e CSRF e
+// restituisce solo l'access token (+ utente).
+async function refreshSession() {
+  const payload = await request("/auth/refresh", { method: "POST", csrf: true });
+  setAccessToken(payload.data.accessToken);
+  return payload.data;
 }
 
 // Un solo refresh alla volta (single-flight): se due chiamate falliscono
 // insieme con 401 (es. doppio mount StrictMode), condividono la stessa
-// rotazione invece di riusare il token già consumato (→ 401 a catena).
+// rotazione invece di usare due volte lo stesso cookie (→ 401 a catena).
 let inflightRefresh = null;
 function singleRefresh() {
   if (!inflightRefresh) {
-    inflightRefresh = refreshPair().then(
-      (fresh) => {
+    inflightRefresh = refreshSession().then(
+      (data) => {
         inflightRefresh = null;
-        return fresh;
+        return data;
       },
       (err) => {
         inflightRefresh = null;
-        tokenStore.clear();
+        clearAccessToken();
         throw err;
       },
     );
@@ -100,44 +91,68 @@ function singleRefresh() {
   return inflightRefresh;
 }
 
-// Entry point per le pagine (risorsa singola): restituisce `data`.
-// Aggiunge il token e, su 401, tenta un refresh condiviso prima di arrendersi.
-export async function api(path, options = {}) {
-  const token = options.token ?? tokenStore.getAccess();
+// All'avvio della pagina: se il cookie di sessione è valido, recupera utente
+// e access token; altrimenti null (utente non loggato, nessun errore in console).
+export async function restoreSession() {
   try {
-    const payload = await withAuthRetry((t) => request(path, { ...options, token: t }), options, token);
-    return payload.data;
+    return await singleRefresh();
+  } catch {
+    return null;
+  }
+}
+
+// Esegue la chiamata col token dato; su 401 usa il refresh condiviso
+// (single-flight) e ripete una sola volta.
+async function withAuthRetry(fn, options) {
+  const current = options.token ?? accessToken;
+  try {
+    return await fn(current);
   } catch (err) {
+    if (err instanceof ApiError && err.status === 401 && current && !options.retried) {
+      const fresh = await singleRefresh().catch(() => null);
+      if (fresh) {
+        return fn(fresh.accessToken);
+      }
+    }
     throw err;
   }
+}
+
+// Entry point per le pagine (risorsa singola): restituisce `data`.
+export async function api(path, options = {}) {
+  const payload = await withAuthRetry((token) => request(path, { ...options, token }), options);
+  return payload.data;
 }
 
 // Entry point per le liste paginate: restituisce { items, meta }.
 // Le liste backend rispondono { data: [], meta } — mai scartare meta.
 export async function apiPaged(path, params = {}, options = {}) {
-  const token = options.token ?? tokenStore.getAccess();
   const payload = await withAuthRetry(
-    (t) => request(`${path}${toQuery(params)}`, { ...options, token: t }),
+    (token) => request(`${path}${toQuery(params)}`, { ...options, token }),
     options,
-    token,
   );
   return { items: payload.data ?? [], meta: payload.meta ?? null };
 }
 
 // --- Auth ---
+// Il server risponde { user, accessToken }: il token viene tenuto qui in
+// memoria, il refresh resta nel cookie HttpOnly.
+async function startSession(promise) {
+  const data = await promise;
+  setAccessToken(data.accessToken);
+  return data;
+}
+
 export const authApi = {
-  // { email, password, firstName?, lastName? } -> { user, tokens }.
-  register: (input) => api("/auth/register", { method: "POST", body: input }),
-  // { email, password } -> { user, tokens }.
-  login: (input) => api("/auth/login", { method: "POST", body: input }),
+  // { email, password, firstName?, lastName? } -> { user, accessToken }.
+  register: (input) => startSession(api("/auth/register", { method: "POST", body: input })),
+  // { email, password } -> { user, accessToken }.
+  login: (input) => startSession(api("/auth/login", { method: "POST", body: input })),
   me: (token) => api("/auth/me", { token }),
   // Salva la lingua preferita nel profilo (segue l'utente su ogni dispositivo).
   updateMe: (input) => api("/auth/me", { method: "PATCH", body: input }),
-  // Revoca lato server la sessione: senza questa chiamata il refresh token
-  // resterebbe valido anche dopo il logout dal dispositivo. I token sono
-  // passati esplicitamente perché lo stato locale viene già pulito.
-  logout: (refreshToken, accessToken) =>
-    api("/auth/logout", { method: "POST", body: { refreshToken }, token: accessToken }),
+  // Revoca lato server la sessione (cookie + famiglia) e cancella i cookie.
+  logout: () => api("/auth/logout", { method: "POST", csrf: true }),
   // Chiude tutte le sessioni dell'utente (tutti i dispositivi).
   logoutAll: () => api("/auth/logout-all", { method: "POST" }),
 };

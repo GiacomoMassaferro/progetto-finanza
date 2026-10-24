@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { setLanguage } from "../i18n/index.js";
-import { authApi, tokenStore } from "../lib/api.js";
+import { authApi, clearAccessToken, restoreSession } from "../lib/api.js";
 
 // Stato globale di sessione: user, caricamento iniziale, login/register/logout.
 // Le pagine usano useAuth() invece di toccare i token a mano.
@@ -11,29 +11,34 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // All'avvio: se c'è un token salvato, ricarica il profilo (col refresh
-  // automatico se l'access è scaduto ma il refresh è valido) e applica
-  // la lingua salvata nel profilo (verità su ogni dispositivo).
+  // All'avvio: il refresh token è in un cookie HttpOnly, quindi l'unico modo
+  // per sapere se c'è una sessione è chiedere un nuovo access token.
+  // restoreSession() non lancia: senza cookie valido restituisce null.
   useEffect(() => {
-    if (!tokenStore.getAccess()) {
-      setLoading(false);
-      return;
-    }
-    authApi
-      .me(tokenStore.getAccess())
-      .then(({ user: me }) => {
-        setUser(me);
-        if (me.language) {
-          setLanguage(me.language);
+    let cancelled = false;
+    restoreSession()
+      .then(async (data) => {
+        if (cancelled || !data?.user) {
+          return;
+        }
+        setUser(data.user);
+        if (data.user.language) {
+          await setLanguage(data.user.language);
         }
       })
-      .catch(() => tokenStore.clear())
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // Login/register: il token in memoria lo salva api.js, qui aggiorniamo lo stato.
   const login = useCallback(async (input) => {
-    const { user: me, tokens } = await authApi.login(input);
-    tokenStore.set(tokens);
+    const { user: me } = await authApi.login(input);
     setUser(me);
     if (me.language) {
       await setLanguage(me.language);
@@ -42,8 +47,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const register = useCallback(async (input) => {
-    const { user: me, tokens } = await authApi.register(input);
-    tokenStore.set(tokens);
+    const { user: me } = await authApi.register(input);
     setUser(me);
     if (me.language) {
       await setLanguage(me.language);
@@ -51,16 +55,16 @@ export function AuthProvider({ children }) {
     return me;
   }, []);
 
-  // Logout: pulisce subito lo stato locale (l'utente esce anche se la rete
-  // è lenta) e poi revoca la sessione sul server. I token vengono letti
-  // prima della pulizia e passati esplicitamente.
+  // Logout: revoca la sessione sul server (cookie + famiglia) e poi pulisce
+  // lo stato locale, anche se la chiamata fallisce (l'utente deve uscire sempre).
   const logout = useCallback(async () => {
-    const refreshToken = tokenStore.getRefresh();
-    const accessToken = tokenStore.getAccess();
-    tokenStore.clear();
-    setUser(null);
-    if (refreshToken) {
-      await authApi.logout(refreshToken, accessToken).catch(() => {});
+    try {
+      await authApi.logout();
+    } catch {
+      // Best-effort: la sessione locale viene comunque chiusa.
+    } finally {
+      clearAccessToken();
+      setUser(null);
     }
   }, []);
 

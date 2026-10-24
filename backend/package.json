@@ -11,6 +11,11 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "db:seed": "node prisma/seed.js",
+    "db:test:status": "node scripts/prisma-test.js migrate status",
+    "db:test:migrate": "node scripts/prisma-test.js migrate dev",
+    "db:test:reset": "node scripts/prisma-test.js migrate reset --force",
+    "db:test:seed": "node --env-file=.env.test prisma/seed.js",
+    "dev:test": "node --watch --env-file=.env.test src/server.js",
     "test": "vitest run"
   },
   "keywords": [],

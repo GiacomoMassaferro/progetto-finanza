@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { AppError } from "../../common/utils/AppError.js";
 import { withAlive } from "../../common/utils/softDelete.js";
+import { ttlToMs } from "../../common/utils/ttl.js";
 import { env } from "../../config/env.js";
 import { prisma } from "../../config/prisma.js";
 
@@ -13,17 +14,6 @@ const BCRYPT_ROUNDS = 10;
 // bcrypt anche quando l'utente non esiste, così il tempo di risposta del
 // login non rivela quali email sono registrate (user enumeration).
 const DUMMY_HASH = "$2b$10$X/lHZn8VBEsqNpZRdI1CieSaYNFRL2YoKGEkXm.mSBleJ7nfQav1.";
-
-// Converte "15m"/"1h"/"7d" in millisecondi per la scadenza DB dei refresh.
-function ttlToMs(ttl) {
-    const match = /^(\d+)([mhd])$/.exec(ttl);
-    if (!match) {
-        throw new Error(`TTL non supportato: "${ttl}" (usa formati come 15m, 1h, 7d)`);
-    }
-    const value = Number(match[1]);
-    const unit = { m: 60_000, h: 3_600_000, d: 86_400_000 }[match[2]];
-    return value * unit;
-}
 
 // Finestra di tolleranza sul riuso: due richieste di refresh quasi simultanee
 // (due tab aperte) non sono un furto. Oltre la finestra, il riuso di un token

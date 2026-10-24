@@ -68,12 +68,46 @@ pnpm db:studio                                  # ispeziona il DB su :5555
 | `pnpm db:generate` | rigenera il client Prisma |
 | `pnpm db:studio` | UI web del database |
 | `pnpm db:seed` | dati demo (demo@example.com / DemoPass123, idempotente) |
+| `pnpm dev:test` | API su `http://localhost:3001` contro il DB di test |
+| `pnpm db:test:status` | stato migration del DB di test |
+| `pnpm db:test:migrate` | applica/crea migration solo sul DB di test |
+| `pnpm db:test:reset` | azzera e ricrea il DB di test (distruttivo, solo `*_test`) |
+| `pnpm db:test:seed` | dati demo sul DB di test |
+
+## Database di test delle migrazioni
+
+Per provare una migration senza rischiare i dati reali esiste `backend/.env.test`
+(gitignored, template in `.env.test.example`) che punta a `express_finance_test`
+e `express_finance_test_shadow`. Setup una tantum, da `backend/`:
+
+```powershell
+mysql -u root -p < scripts/create-test-db.sql   # crea DB + grant
+Copy-Item .env.test.example .env.test            # poi compila i valori
+pnpm db:test:migrate                             # replica lo schema sul DB di test
+pnpm db:test:status                              # deve risultare "up to date"
+```
+
+Il wrapper `scripts/prisma-test.js` rifiuta di partire se le URL non puntano a
+database che contengono `_test`: un errore di battitura non può toccare
+`express_finance`. `pnpm db:migrate` continua a lavorare sul DB di sviluppo.
 
 ## Variabili d'ambiente
 
 Vedi `backend/.env.example`. Nota: in locale `DATABASE_SSL` resta `false`
 (l'SSL attivo blocca l'handshake col MySQL locale); in produzione con
 certificati validi va impostato a `true`.
+
+## Sessione e cookie
+
+Il refresh token vive in un cookie `HttpOnly` (`pf_refresh`), quindi JavaScript
+non può leggerlo: il frontend tiene in memoria solo l'access token (15 min) e
+lo recupera al reload tramite il cookie. Le richieste usano
+`credentials: "include"`; refresh e logout richiedono l'header `x-csrf-token`
+col valore del cookie `pf_csrf` (protezione CSRF). In produzione i cookie sono
+`Secure` di default; se frontend e API stanno su siti diversi servono
+`COOKIE_SAME_SITE="none"` e `COOKIE_SECURE="true"`. Client non-browser (curl,
+mobile) possono tornare al vecchio contratto con `x-auth-mode: bearer`, che
+restituisce i token nel body.
 
 ## Cancellazioni (soft delete)
 
@@ -96,6 +130,10 @@ Copy-Item .env.example .env   # opzionale: default = http://localhost:3000/api/v
 pnpm install
 pnpm dev                      # http://localhost:5173 (il backend deve girare)
 ```
+
+Apri **`http://localhost:5173`**, non `127.0.0.1`: il backend autorizza un solo
+origin CORS e i cookie di sessione sono legati all'host, quindi da `127.0.0.1`
+login e refresh falliscono (il dev server reindirizza comunque su `localhost`).
 
 Login con `demo@example.com / DemoPass123` (dopo `pnpm db:seed` nel backend).
 Pagine: dashboard coi dati veri, transazioni, debiti/rate, categorie
@@ -184,12 +222,45 @@ pnpm db:studio                                  # inspect the DB on :5555
 | `pnpm db:generate` | regenerate the Prisma client |
 | `pnpm db:studio` | web UI for the database |
 | `pnpm db:seed` | demo data (demo@example.com / DemoPass123, idempotent) |
+| `pnpm dev:test` | API on `http://localhost:3001` against the test DB |
+| `pnpm db:test:status` | migration status of the test DB |
+| `pnpm db:test:migrate` | create/apply migrations on the test DB only |
+| `pnpm db:test:reset` | wipe and recreate the test DB (destructive, `*_test` only) |
+| `pnpm db:test:seed` | demo data on the test DB |
+
+## Migration test database
+
+To try a migration without risking real data there is `backend/.env.test`
+(gitignored, template in `.env.test.example`) pointing at `express_finance_test`
+and `express_finance_test_shadow`. One-time setup, from `backend/`:
+
+```powershell
+mysql -u root -p < scripts/create-test-db.sql   # create DBs + grants
+Copy-Item .env.test.example .env.test            # then fill in the values
+pnpm db:test:migrate                             # replay the schema on the test DB
+pnpm db:test:status                              # must report "up to date"
+```
+
+The `scripts/prisma-test.js` wrapper refuses to run unless the URLs point to
+databases containing `_test`: a typo cannot touch `express_finance`.
+`pnpm db:migrate` keeps working on the development DB.
 
 ## Environment variables
 
 See `backend/.env.example`. Note: locally `DATABASE_SSL` stays `false`
 (enabled SSL stalls the handshake with local MySQL); in production with valid
 certificates set it to `true`.
+
+## Session and cookies
+
+The refresh token lives in an `HttpOnly` cookie (`pf_refresh`), so JavaScript
+cannot read it: the frontend only keeps the access token in memory (15 min) and
+recovers it on reload through the cookie. Requests use `credentials: "include"`;
+refresh and logout require the `x-csrf-token` header matching the `pf_csrf`
+cookie (CSRF protection). In production cookies are `Secure` by default; if
+frontend and API live on different sites use `COOKIE_SAME_SITE="none"` and
+`COOKIE_SECURE="true"`. Non-browser clients (curl, mobile) can fall back to the
+old contract with `x-auth-mode: bearer`, which returns the tokens in the body.
 
 ## Deletions (soft delete)
 
@@ -212,6 +283,10 @@ Copy-Item .env.example .env   # optional: default = http://localhost:3000/api/v1
 pnpm install
 pnpm dev                      # http://localhost:5173 (backend must run)
 ```
+
+Open **`http://localhost:5173`**, not `127.0.0.1`: the backend allows a single
+CORS origin and session cookies are host-scoped, so from `127.0.0.1` login and
+refresh fail (the dev server redirects to `localhost` anyway).
 
 Login with `demo@example.com / DemoPass123` (after `pnpm db:seed` in backend).
 Pages: real-data dashboard, transactions, debts/installments, categories

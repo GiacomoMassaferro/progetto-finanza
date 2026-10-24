@@ -82,8 +82,13 @@ backend/
 | `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | no | `15m` / `1d` | token lifetimes (`Nm`/`Nh`/`Nd` format); refresh rotated on every use, so 1 day is enough |
 | `TRUST_PROXY` | no | `0` | number of trusted reverse proxies (rate limit must see the real client IP; wrong value = spoofable `X-Forwarded-For`) |
 | `SEED_ALLOW_PRODUCTION` | no | — | `1` re-enables `pnpm db:seed` in production (demo user with known password: never by default) |
+| `COOKIE_SECURE` | no | `true` in production | `Secure` flag on session cookies (D-28) |
+| `COOKIE_SAME_SITE` | no | `lax` | `strict\|lax\|none`; `none` requires `COOKIE_SECURE=true` (validated at boot) |
+| `COOKIE_DOMAIN` | no | — | optional parent domain (`.example.com`) to share the session across subdomains |
 | `GEMINI_API_KEY` | no | — | Gemini key; empty ⇒ AI stays on deterministic rules (D-20) |
 | `GEMINI_MODEL` | no | `gemini-3.8-flash` | model used by the narrative layer |
+
+`backend/.env.test` (gitignored, template `.env.test.example`) mirrors the same keys with `*_test` databases and `PORT=3001`; it is used only by `db:test:*` and `dev:test` (D-27).
 
 ### 2.4 API (current)
 
@@ -92,11 +97,11 @@ backend/
 | `GET /health` | no | liveness, no DB touch |
 | `GET /ready` | no | readiness, runs `SELECT 1` via Prisma |
 | `GET /api/v1/status` | no | API info (`{ data: { name, version } }`), reachability check for the frontend |
-| `POST /api/v1/auth/register` | no | body `{ email, password 8…72 bytes, firstName?, lastName? }` → 201 `{ data: { user, tokens } }`; duplicate email → 409 with a deliberately ambiguous message (no enumeration) |
-| `POST /api/v1/auth/login` | no | body `{ email, password }` → 200 `{ data: { user, tokens } }`, 401 generic on bad credentials (constant-time: dummy bcrypt compare when the email does not exist) |
-| `POST /api/v1/auth/refresh` | no | body `{ refreshToken }` → 200 new pair, same token family; single-use atomic rotation; reuse beyond 30s grace → whole family revoked → 401 |
-| `POST /api/v1/auth/logout` | **yes (Bearer access)** | body `{ refreshToken }` → 200 `{ data: { revoked } }`: revokes the token **and its family** server-side (idempotent) |
-| `POST /api/v1/auth/logout-all` | **yes (Bearer access)** | revokes every active refresh token of the user → 200 `{ data: { revoked: n } }` |
+| `POST /api/v1/auth/register` | no | body `{ email, password 8…72 bytes, firstName?, lastName? }` → 201; duplicate email → 409 with a deliberately ambiguous message (no enumeration). **Cookie mode (default):** refresh in `pf_refresh` cookie, body `{ user, accessToken, expiresIn }`. **Bearer mode** (`x-auth-mode: bearer`): body `{ user, tokens }` |
+| `POST /api/v1/auth/login` | no | body `{ email, password }` → 200 same shape as register; 401 generic (constant-time dummy bcrypt when the email does not exist) |
+| `POST /api/v1/auth/refresh` | no | token from the `pf_refresh` cookie (or `refreshToken` in body = bearer mode); cookie mode requires `x-csrf-token` matching `pf_csrf` → 403 otherwise. 200 new access token, rotated cookies, same family; reuse beyond 30s grace → family revoked → 401 |
+| `POST /api/v1/auth/logout` | **yes (Bearer access)** | cookie mode: revokes the cookie's token + family and clears both cookies (CSRF required); bearer mode: `{ refreshToken }` in body. 200 `{ data: { revoked } }`, idempotent |
+| `POST /api/v1/auth/logout-all` | **yes (Bearer access)** | revokes every active refresh token of the user and clears local cookies → 200 `{ data: { revoked: n } }` |
 | `GET /api/v1/auth/me` | **yes (Bearer access)** | 200 `{ data: { user } }`, 401 without/invalid token |
 | `PATCH /api/v1/auth/me` | **yes (Bearer access)** | body `{ language: en\|it\|es\|de }` → 200 `{ data: { user } }`, saved to profile |
 | `GET /api/v1/categories` | **yes** | list own active categories, `?page&limit(max100)&type=`, 200 `{ data: [], meta: { page, limit, total, pages } }` |
@@ -200,11 +205,15 @@ Cross-cutting columns on every **domain** model: `createdAt`, `updatedAt`, `dele
 | 2026-10-22 | D-23 | Optimistic concurrency (`updateMany` with the read value in the WHERE) + bounded retry instead of version columns or row locks | no migration, works with MySQL default isolation; conflicting payments retry or return 409, never lose a deposit |
 | 2026-10-22 | D-24 | LLM narrative is post-validated against a whitelist of numbers taken from the rule engine; creditor names are replaced by anonymous labels; 15s timeout | the model can no longer invent figures (discarded → rules stay), and user-controlled strings never enter the prompt (prompt injection + D-17 minimization) |
 | 2026-10-22 | D-25 | TAEG is treated as an **effective** annual rate (`(1+t)^(1/12)-1`), TAN as nominal (`t/12`); single precedence TAEG > TAN > legacy `interestRate` for both the amortization plan and the simulator | the plan and the payoff simulation now use the same rate; a 12% TAEG no longer costs as much as a 12% nominal loan |
-| 2026-10-22 | D-26 | Tokens stay in `localStorage` for now (access 15m + rotated refresh, server-side revocation on logout); httpOnly+SameSite cookie + CSRF token remains an open decision | moving to cookies changes CORS/CSRF on both sides; the audit gap is documented in §10 instead of silently half-fixing it |
+| 2026-10-22 | D-26 | Tokens stay in `localStorage` for now (access 15m + rotated refresh, server-side revocation on logout); httpOnly+SameSite cookie + CSRF token remains an open decision | moving to cookies changes CORS/CSRF on both sides; the audit gap is documented in §10 instead of silently half-fixing it. **Superseded the same day by D-28** |
+| 2026-10-22 | D-28 | Auth transport split by client: browser gets the refresh token only in an `HttpOnly` cookie (`pf_refresh`, `Path=/api/v1/auth`, `SameSite=Lax`, `Secure` in prod) + a readable `pf_csrf` cookie checked via double-submit header on refresh/logout; the access token (15m) stays **in memory** in the frontend. Non-browser clients opt into the old contract with `x-auth-mode: bearer` (or a `refreshToken` in the body) | XSS can no longer read or exfiltrate the refresh token, and CSRF is blocked by both `SameSite` and the double-submit check; keeping bearer opt-in avoids breaking curl/mobile clients and the existing tests |
+| 2026-10-22 | D-27 | Dedicated `express_finance_test` + `_shadow` databases, selected via gitignored `.env.test` and a wrapper (`scripts/prisma-test.js`) that refuses any target not matching `*_test` | migration experiments must be destructive-friendly; a typo in `DATABASE_URL` can never wipe the real DB, and the dev DB stays usable while testing |
 
 ## 5. Changelog (newest first — every entry dated)
 
 
+- **2026-10-22** — Auth in httpOnly cookies (D-28, supersedes D-26): refresh token only in `pf_refresh` (HttpOnly, Path=/api/v1/auth, SameSite=Lax, Secure in prod) + `pf_csrf` with double-submit check on refresh/logout; access token in memory (no more `localStorage`); `x-auth-mode: bearer` keeps the old contract for API clients. CORS now allows credentials; body of refresh/logout optional. New `tests/auth.cookie.test.js` (11 tests) → **93/93**; verified end-to-end over HTTP (login → me → refresh without CSRF = 403 → refresh = 200 with rotation → logout → refresh = 401).
+- **2026-10-22** — Migration test environment (D-27): databases `express_finance_test` + `express_finance_test_shadow` (script `backend/scripts/create-test-db.sql`), gitignored `.env.test` with template `.env.test.example`, wrapper `scripts/prisma-test.js` with `*_test` guard, scripts `db:test:status|migrate|reset|seed` and `dev:test` (:3001). Verified: 7/7 migrations replayed on the test DB, seed ok, dev DB untouched (37 users), guard rejects `express_finance`. Work continues on branch `test/migrations`.
 - **2026-10-22** — Audit remediation (correctness/concurrency): single money validator with `MAX_AMOUNT` (D-22), atomic `pay()`/`deposit()` with optimistic retry (D-23), partial payment + surplus handling, `simulate()` rewritten (no `stuck` lies, single warning, `null` instead of fake debt-free dates, no inflated interest), month arithmetic clamped, TAEG treated as effective rate with one precedence rule (D-25); 66 tests green.
 - **2026-10-22** — Audit remediation (security): refresh-token families + reuse detection + `logout`/`logout-all` (D-21, migration `20261022114425`), constant-time login, ambiguous 409 on register, password cap 72 bytes, 404 without echoed URL, Prisma error mapping, trusted proxy, limiter on `/ready`, seed blocked outside dev, JWT secret rejects placeholders/weak values, refresh TTL default `1d`; new `auth.security.test.js`; 76 tests green.
 - **2026-10-22** — Audit remediation (AI): narrative whitelisted against the rule-engine numbers, anonymized creditor labels, 15s timeout, stricter zod caps; new `ai.llm.guardrails.test.js`.
@@ -335,6 +344,20 @@ pnpm test               # vitest suite (needs MySQL up; uses throwaway test-* us
 
 Startup order: MySQL (3306) → `pnpm dev` → check `/health` then `/ready`.
 Prereqs: Node 24, pnpm 11, MySQL 8.x with databases `express_finance` + empty `express_finance_shadow` and user `prisma_user`.
+
+Migration experiments (never on real data):
+
+```powershell
+mysql -u root -p < scripts/create-test-db.sql   # once: express_finance_test + _shadow + grants
+Copy-Item .env.test.example .env.test            # once: fill credentials (gitignored)
+pnpm db:test:status                              # pending migrations on the test DB
+pnpm db:test:migrate                             # `migrate dev` against .env.test
+pnpm db:test:reset                               # wipe + replay (destructive, *_test only)
+pnpm db:test:seed                                # demo user on the test DB
+pnpm dev:test                                    # API on :3001 against the test DB
+```
+
+`scripts/prisma-test.js` loads `.env` then `.env.test` (override) and aborts unless both URLs point to a DB containing `_test` and differing from the dev DB (D-27). Work happens on branch `test/migrations`.
 Smoke-test hygiene: `Stop-Job` does NOT kill child `node` processes — kill them (`Get-Process node | Stop-Process -Force`) or use `Start-Process`/`Stop-Process -Id`, else stale code keeps serving :3000 (see I-09).
 
 ## 8. Troubleshooting (known incidents)
@@ -422,7 +445,8 @@ Smoke-test hygiene: `Stop-Job` does NOT kill child `node` processes — kill the
 - Enumeration: login is constant-time (dummy bcrypt for unknown emails), register answers 409 with the same generic message, `notFound` no longer echoes the URL, 5xx never leak stack traces in production.
 - Local `DATABASE_SSL=false` is dev-only; prod DB connections must use `DATABASE_SSL=true` with valid certs.
 - `express.json({ limit: "100kb" })` + `x-powered-by` disabled + `helmet` headers + CORS restricted to `FRONTEND_URL` (array form, see I-05). `TRUST_PROXY` must match the real proxy chain, otherwise rate-limit keys are spoofable.
-- **Open gaps:** frontend keeps access+refresh tokens in `localStorage` (XSS ⇒ token theft; migration to httpOnly+SameSite cookies + CSRF token not started, D-26); no account lockout/backoff after repeated failed logins; no 2FA; password blacklist absent.
+- **Frontend session storage:** gone — the refresh token lives in an `HttpOnly` cookie and the access token only in memory (D-28), so XSS cannot read/exfiltrate credentials; CSRF is covered by `SameSite=Lax` + double-submit on refresh/logout. CORS uses `credentials: true` with an explicit origin (no wildcard).
+- **Open gaps:** no account lockout/backoff after repeated failed logins; no 2FA; password blacklist absent; cookie mode assumes same-site frontend/API (`SameSite=None` requires HTTPS + `COOKIE_SECURE=true`).
 - **AI:** the narrative is never trusted for numbers (whitelist), user-controlled strings are anonymized before reaching Gemini, 15s timeout, key read only from `env.js`.
 
 ## 11. Roadmap
@@ -433,7 +457,7 @@ Smoke-test hygiene: `Stop-Job` does NOT kill child `node` processes — kill the
 4. **Tooling** — vitest + supertest ✅ 2026-10-08, 82 tests 2026-10-22; Docker/compose still open.
 5. **Frontend** — F1 ✅, F2 ✅, F3 ✅ 2026-10-10 (transactions/debts/categories pages wired; Stitch sources deleted); server-side logout ✅ 2026-10-22.
 6. **AI layer** — AI-1a ✅, AI-1b ✅, Phase 2 narrative ✅ 2026-10-10 (Gemini Flash best-effort, needs `GEMINI_API_KEY` for live narrative) → UI wiring of narrative card.
-7. **Audit remediation** — correctness/concurrency/security/AI guardrails ✅ 2026-10-22; open: httpOnly cookie migration (D-26), login lockout, Docker/compose.
+7. **Audit remediation** — correctness/concurrency/security/AI guardrails ✅ 2026-10-22; auth on httpOnly cookies ✅ 2026-10-22 (D-28); open: login lockout, Docker/compose.
 
 ## 12. Glossary
 
